@@ -1,7 +1,3 @@
-Django>=4.2,<5.0
-pyserial
-numpy
-python-dotenv
-django-cors-headers
-channels
-daphne 
+Django>=5.2,<6.0
+pyserial>=3.5
+python-dotenv>=1.0.0 

@@ -6,7 +6,6 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth import authenticate, login, logout
 from .lora_client import lora_client
 
-@csrf_exempt
 def login_view(request):
     if request.method == 'POST':
         username = request.POST.get('username')
