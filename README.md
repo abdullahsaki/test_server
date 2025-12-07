@@ -102,7 +102,6 @@ test_server/
 - **Elif Aykırı** - Fizik Mühendisliği
 - **Abdullah Saki** - Elektrik-Elektronik Mühendisliği  
 - **Kerem Odabaş** - Elektrik-Elektronik Mühendisliği
-- **Sümeyra Şimşek** - Elektrik-Elektronik Mühendisliği
 - **Şevin Kaya** - Elektrik-Elektronik Mühendisliği
 
 ## 🎓 Akademik Danışmanlar
