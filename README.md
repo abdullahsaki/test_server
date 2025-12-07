@@ -24,12 +24,10 @@ Bu proje, LoRa teknolojisi kullanarak uzun menzilli iletişim sağlayan mobil ro
 ### Gereksinimler:
 - Python 3.8+
 - PostgreSQL
-- LoRa Modülü (SX1276/SX1278/RFM95)
+- LoRa Modülü (E22 900T22D)
 
 ### Kurulum Adımları:
 ```bash
-# Sanal ortamı aktifleştir
-source venv/bin/activate
 
 # Bağımlılıkları yükle
 pip install -r requirements.txt
@@ -45,9 +43,9 @@ python3 manage.py runserver
 
 LoRa modülünüzü `/dev/ttyUSB0` portuna bağlayın. Farklı bir port kullanıyorsanız, `lora_client.py` dosyasındaki port ayarını değiştirin.
 
-```python
+```pythonS
 # lora_client.py içinde
-lora_client = LoRaClient(port='/dev/ttyUSB0', baudrate=9600)
+lora_client = LoRaClient(port='/dev/ttyUSB0', baudrate=115200)
 ```
 
 ## 📊 Veritabanı
@@ -90,13 +88,12 @@ test_server/
 - ✅ PostgreSQL veritabanı
 - ✅ Admin paneli
 - ✅ Kullanıcı yönetimi
-- ✅ Düşük güç tüketimi
 
 ## 🔬 Teknolojik Özellikler
 
 - **LoRa İletişimi**: Uzun menzilli, düşük güç tüketimli iletişim
 - **Web Tabanlı Kontrol**: Django ile geliştirilmiş modern web arayüzü
-- **Gerçek Zamanlı Veri**: IMU sensörleri ve robot durumu takibi
+- **Gerçek Zamanlı Veri**: IMU sensörleri, Lidar ve robot durumu takibi
 - **Mobil Kontrol**: İleri, geri, sağ, sol hareket komutları
 - **Sensör Verileri**: RSSI, pil durumu, mesafe ve konum bilgileri
 
@@ -115,8 +112,8 @@ test_server/
 
 ## 📋 Proje Bilgileri
 
-- **Proje Başlığı**: LoRa Tabanlı Robotik Test Sistemi
-- **Destek Programı**: TÜBİTAK 2209-B Sanayiye Yönelik Lisans Araştırma Projesi
+- **Proje Başlığı**: Robotik WiFi Test Sİstemi
+- **Destek Programı**: 2209-B - Üniversite Öğrencileri Sanayiye Yönelik Araştırma Projeleri Desteği Programı
 - **Yürütüleceği Kurum**: Türk Telekom
 - **Proje Süresi**: 12 Ay
 
