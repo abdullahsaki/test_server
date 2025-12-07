@@ -2,7 +2,7 @@
 
 ## 🚀 Proje Hakkında
 
-Bu proje, LoRa teknolojisi kullanarak uzun menzilli iletişim sağlayan mobil robot sistemlerini geliştirmeyi ve robotun otonom görev yürütme kapasitesini test etmeyi amaçlamaktadır.
+Bu proje, LoRa teknolojisi ile uzun menzilli iletişim sağlayarak mobil robot sistemini kontrol etmeyi ve robotun otonom görev yürütme yeteneğini kullanarak WiFi testlerinin otonom olarak yapılmasını amaçlamaktadır.
 
 ## 🔐 Admin Paneli Erişimi
 
