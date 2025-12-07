@@ -1,0 +1,79 @@
+############################
+# Python / Django project
+############################
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+############################
+# Django
+############################
+
+# SQLite databases
+*.sqlite3
+*.sqlite
+db.sqlite3
+cmd_vel_web/db.sqlite3
+
+# Django static / media (collected or generated)
+staticfiles/
+static/
+media/
+
+# Django logs
+*.log
+logs/
+
+############################
+# Testing / coverage / type checking
+############################
+
+.pytest_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+############################
+# Editor / IDE / OS files
+############################
+
+.vscode/
+.idea/
+*.swp
+*.swo
+*.orig
+.DS_Store
+Thumbs.db
+
+############################
+# Node / frontend (if any)
+############################
+
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-lock.yaml

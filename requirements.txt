@@ -1,0 +1,7 @@
+Django>=4.2,<5.0
+pyserial
+numpy
+python-dotenv
+django-cors-headers
+channels
+daphne 
