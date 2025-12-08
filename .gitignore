@@ -38,7 +38,6 @@ cmd_vel_web/db.sqlite3
 
 # Django static / media (collected or generated)
 staticfiles/
-static/
 media/
 
 # Django logs
