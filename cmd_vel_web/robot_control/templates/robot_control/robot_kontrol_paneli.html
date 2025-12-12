@@ -224,7 +224,7 @@
                             <div class="row justify-content-center align-items-center">
                                 <div class="col-md-10">
                                     <div class="text-center">
-                                        <h6 class="mb-2">SignalLevel(LORA İLE GELEN VERİYE GÖRE DÜZENLENECEK)</h6>
+                                        <h6 class="mb-2">SignalLevel</h6>
                                         <div class="text-muted small">
                                             <span>ts: <span id="tsValue">-</span></span>
                                             <span class="mx-2">|</span>
@@ -322,8 +322,8 @@
 
         <!-- Manuel Kontrol Bölümü -->
         <div id="teleop" class="content-section">
-            <div class="row justify-content-center">  <!-- ortalama için eklendi -->
-                <div class="col-lg-6 col-md-8"> <!-- genişliği ortalamak için -->
+            <div class="row justify-content-center">
+                <div class="col-lg-6 col-md-8">
                     <div class="card">
                         <div class="card-body">
                             <h5 class="card-title text-center">Robot Kontrolleri</h5>
@@ -374,8 +374,6 @@
         <div id="raw-data" class="content-section">
             <div class="row">
                 <div class="col-md-12">
-                    
-                    <!-- LoRa'dan gelen mesajlar için ayrı kutucuk -->
                     <div class="card mt-3">
                         <div class="card-body">
                             <h5 class="card-title">LoRa'dan Gelen Son Mesaj</h5>
@@ -428,8 +426,8 @@
                                 </div>
                                 <div class="col-md-6">
                                     <ul>
-                                        <li><strong>Akademik Danışman:</strong> Dr. Öğr. Üyesi Haluk Bayram</li>
-                                        <li><strong>Sanayi Danışmanı:</strong> Samet Özabacı (Türk Telekom)</li>
+                                        <li><strong>Akademik Danışman:</strong> Doç. Dr. Haluk Bayram</li>
+                                        <li><strong>Sanayi Danışmanı:</strong> Dr. ad. Samet Özabacı (Türk Telekom)</li>
                                     </ul>
                                 </div>
                             </div>
@@ -464,7 +462,6 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Çıkış yapma işlemi
             window.handleLogout = function(event) {
                 event.preventDefault();
                 if (confirm('Çıkış yapmak istediğinizden emin misiniz?')) {
@@ -472,33 +469,27 @@
                 }
             };
 
-            // Sekme değiştirme işlevselliği
             const navLinks = document.querySelectorAll('.nav-link');
             const sections = document.querySelectorAll('.content-section');
 
             function showSection(sectionId) {
-                // Tüm bölümleri gizle
                 sections.forEach(section => {
                     section.classList.remove('active-section');
                     section.style.display = 'none';
                 });
 
-                // Tüm nav linklerinden active class'ını kaldır
                 navLinks.forEach(link => link.classList.remove('active'));
 
-                // Seçilen bölümü göster
                 const targetSection = document.getElementById(sectionId);
                 if (targetSection) {
                     targetSection.classList.add('active-section');
                     targetSection.style.display = 'block';
                 }
 
-                // Seçilen nav link'e active class'ı ekle
                 const activeLink = document.querySelector(`.nav-link[data-section="${sectionId}"]`);
                 if (activeLink) activeLink.classList.add('active');
             }
 
-            // Her nav link için click event listener ekle
             navLinks.forEach(link => {
                 link.addEventListener('click', function(e) {
                     e.preventDefault();
@@ -507,10 +498,7 @@
                 });
             });
 
-            // Sayfa yüklendiğinde varsayılan olarak home sekmesini göster
             showSection('home');
-
-            // Uzaktan kontrol butonları (sade)
             const buttonIdToCommand = { forward: 'www', backward: 'xxx', left: 'aaa', right: 'ddd', stop: 'sss' };
             Object.keys(buttonIdToCommand).forEach(buttonId => {
                 const button = document.getElementById(buttonId);
@@ -536,7 +524,6 @@
                 });
             });
 
-            // Modem modelleri veritabanı
             const modemModels = {
                 'zyxel': [
                     { value: 'vmg3312-t20b', text: 'VMG3312-T20B' },
@@ -556,18 +543,14 @@
                 ]
             };
 
-            // Modem markası değiştiğinde modelleri güncelle
             const modemBrandSelect = document.getElementById('modemBrand');
             const modemModelSelect = document.getElementById('modemModel');
             
             if (modemBrandSelect && modemModelSelect) {
                 modemBrandSelect.addEventListener('change', function() {
                     const selectedBrand = this.value;
-                    
-                    // Model listesini temizle
                     modemModelSelect.innerHTML = '<option value="">Model Seçin</option>';
                     
-                    // Seçilen markanın modellerini ekle
                     if (selectedBrand && modemModels[selectedBrand]) {
                         modemModels[selectedBrand].forEach(model => {
                             const option = document.createElement('option');
@@ -579,7 +562,6 @@
                 });
             }
 
-            // Test formu gönderimi
             const testForm = document.getElementById('testForm');
             if (testForm) {
                 testForm.addEventListener('submit', function(e) {
@@ -611,7 +593,6 @@
                 });
             }
 
-            // Te (robot_launch) butonu
             const launchBtn = document.getElementById('launchBtn');
             if (launchBtn) {
                 launchBtn.addEventListener('click', function() {
@@ -627,7 +608,6 @@
                 });
             }
 
-            // Testi Bitir butonu işlevi
             const stopTestBtn = document.getElementById('stopTestBtn');
             if(stopTestBtn) {
                 stopTestBtn.addEventListener('click', function() {
@@ -642,9 +622,7 @@
             }
 
 
-            // Form validation
             const forms = document.querySelectorAll('.needs-validation');
-            
             Array.from(forms).forEach(form => {
                 form.addEventListener('submit', event => {
                     if (!form.checkValidity()) {
@@ -655,7 +633,6 @@
                 }, false);
             });
 
-            // Robot durum bilgileri - sabit değerler
             document.getElementById('batteryStatus').innerHTML = 'Yükleniyor...';
             document.getElementById('wifiStatus').innerHTML = 'Yükleniyor...';
             document.getElementById('robotStatus').innerHTML = 'Hazır';

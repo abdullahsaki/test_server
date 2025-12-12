@@ -6,12 +6,10 @@ class LoRaClient:
 
     def send_command(self, command: str) -> bool:
         try:
-            # Serial bağlantısının açık olduğunu kontrol et
             if not self.serial_connection.is_open:
                 print(f"[LoRa] HATA: Serial port kapalı!")
                 return False
             
-            # Komutu yalın metin olarak, satır sonu ile gönder
             msg_str = f"{command}\n"
             bytes_written = self.serial_connection.write(msg_str.encode('utf-8'))
             
