@@ -69,16 +69,34 @@ lora_client = LoRaClient(port='/dev/ttyUSB0', baudrate=115200)
 
 ```
 test_server/
-├── cmd_vel_web/
-│   ├── robot_control/          # Ana uygulama
-│   │   ├── lora_client.py     # LoRa iletişim modülü
-│   │   ├── views.py           # Django view'ları
-│   │   └── models.py          # Veritabanı modelleri
-│   ├── cmd_vel_web/           # Django projesi
-│   ├── static/                # Statik dosyalar
-│   └── templates/             # HTML şablonları
-├── requirements.txt           # Python bağımlılıkları
-└── README.md                 # Bu dosya
+├── cmd_vel_web/                    # Django proje klasörü
+│   ├── cmd_vel_web/                # Django proje ayarları
+│   │   ├── __init__.py
+│   │   ├── settings.py            # Proje ayarları
+│   │   ├── urls.py                # Ana URL yapılandırması
+│   │   ├── asgi.py
+│   │   └── wsgi.py
+│   ├── manage.py                   # Django yönetim scripti
+│   ├── db.sqlite3                  # SQLite veritabanı
+│   └── robot_control/              # Ana Django uygulaması
+│       ├── __init__.py
+│       ├── admin.py                # Admin panel ayarları
+│       ├── models.py               # Veritabanı modelleri
+│       ├── views.py                # Django view'ları
+│       ├── urls.py                 # Uygulama URL'leri
+│       ├── lora_client.py          # LoRa iletişim modülü
+│       ├── migrations/             # Veritabanı migration'ları
+│       ├── static/
+│       │   └── robot_control/
+│       │       └── images/
+│       │           └── ttkom_logo.svg
+│       └── templates/
+│           ├── registration/
+│           │   └── kullanici_giris.html
+│           └── robot_control/
+│               └── robot_kontrol_paneli.html
+├── requirements.txt                # Python bağımlılıkları
+└── README.md                       # Proje dokümantasyonu
 ```
 
 ## Özellikler
