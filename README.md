@@ -1,10 +1,10 @@
 # LoRa Tabanlı Robotik Test Sistemi
 
-## 🚀 Proje Hakkında
+## Proje Hakkında
 
 Bu proje, LoRa teknolojisi ile uzun menzilli iletişim sağlayarak mobil robot sistemini kontrol etmeyi ve robotun otonom görev yürütme yeteneğini kullanarak WiFi testlerinin otonom olarak yapılmasını amaçlamaktadır.
 
-## 🔐 Admin Paneli Erişimi
+## Admin Paneli Erişimi
 
 ### Admin Giriş Bilgileri:
 - **URL**: http://127.0.0.1:8000/admin/
@@ -19,7 +19,7 @@ Bu proje, LoRa teknolojisi ile uzun menzilli iletişim sağlayarak mobil robot s
 - **Kullanıcı Adı**: `admin`
 - **Şifre**: `turktelekom`
 
-## 🛠️ Kurulum
+## Kurulum
 
 ### Gereksinimler:
 - Python 3.8+
@@ -28,18 +28,20 @@ Bu proje, LoRa teknolojisi ile uzun menzilli iletişim sağlayarak mobil robot s
 
 ### Kurulum Adımları:
 ```bash
-
 # Bağımlılıkları yükle
 pip install -r requirements.txt
 
 # Veritabanı migration'larını uygula
 python3 manage.py migrate
 
+# Superuser (yönetici) kullanıcısı oluştur
+python3 manage.py createsuperuser
+
 # Sunucuyu başlat
 python3 manage.py runserver
 ```
 
-## 📡 LoRa Modülü Bağlantısı
+## LoRa Modülü Bağlantısı
 
 LoRa modülünüzü `/dev/ttyUSB0` portuna bağlayın. Farklı bir port kullanıyorsanız, `lora_client.py` dosyasındaki port ayarını değiştirin.
 
@@ -48,7 +50,7 @@ LoRa modülünüzü `/dev/ttyUSB0` portuna bağlayın. Farklı bir port kullanı
 lora_client = LoRaClient(port='/dev/ttyUSB0', baudrate=115200)
 ```
 
-## 📊 Veritabanı
+## Veritabanı
 
 ### PostgreSQL Ayarları:
 - **Veritabanı**: `wifi_tester`
@@ -57,13 +59,13 @@ lora_client = LoRaClient(port='/dev/ttyUSB0', baudrate=115200)
 - **Host**: `localhost`
 - **Port**: `5432`
 
-## 🔧 Önemli Notlar
+## Önemli Notlar
 
 ### Admin Şifresi:
 - **Kullanıcı**: `admin`
 - **Şifre**: `turktelekom`
 
-## 📁 Proje Yapısı
+## Proje Yapısı
 
 ```
 test_server/
@@ -79,43 +81,34 @@ test_server/
 └── README.md                 # Bu dosya
 ```
 
-## 🎯 Özellikler
+## Özellikler
 
-- ✅ LoRa tabanlı uzun menzilli iletişim
-- ✅ Robot kontrol arayüzü
-- ✅ Gerçek zamanlı sensör veri toplama
-- ✅ IMU sensörleri ile hareket algılama
-- ✅ PostgreSQL veritabanı
-- ✅ Admin paneli
-- ✅ Kullanıcı yönetimi
+- LoRa tabanlı uzun menzilli iletişim
+- Web tabanlı robot kontrol arayüzü
+- Gerçek zamanlı sensör veri toplama (IMU, Lidar, RSSI, pil durumu)
+- Mobil kontrol (ileri, geri, sağ, sol hareket komutları)
+- PostgreSQL veritabanı
+- Admin paneli ve kullanıcı yönetimi
 
-## 🔬 Teknolojik Özellikler
-
-- **LoRa İletişimi**: Uzun menzilli, düşük güç tüketimli iletişim
-- **Web Tabanlı Kontrol**: Django ile geliştirilmiş modern web arayüzü
-- **Gerçek Zamanlı Veri**: IMU sensörleri, Lidar ve robot durumu takibi
-- **Mobil Kontrol**: İleri, geri, sağ, sol hareket komutları
-- **Sensör Verileri**: RSSI, pil durumu, mesafe ve konum bilgileri
-
-## 👥 Proje Ekibi
+## Proje Ekibi
 
 - **Elif Aykırı** - Fizik Mühendisliği
-- **Abdullah Saki** - Elektrik-Elektronik Mühendisliği  
-- **Kerem Odabaş** - Elektrik-Elektronik Mühendisliği
-- **Şevin Kaya** - Elektrik-Elektronik Mühendisliği
+- **Abdullah Saki** - Elektrik Elektronik Mühendisliği  
+- **Kerem Odabaş** - Elektrik Elektronik Mühendisliği
+- **Şevin Kaya** - Elektrik Elektronik Mühendisliği
 
-## 🎓 Akademik Danışmanlar
+## Akademik Danışmanlar
 
-- **Akademik Danışman**: Dr. Öğr. Üyesi Haluk Bayram
-- **Sanayi Danışmanı**: Samet Özabacı (Türk Telekom)
+- **Akademik Danışman**: Doç. Dr. Haluk Bayram
+- **Sanayi Danışmanı**: Dr. ad. Samet Özabacı (Türk Telekom)
 
-## 📋 Proje Bilgileri
+## Proje Bilgileri
 
 - **Proje Başlığı**: Robotik WiFi Test Sİstemi
 - **Destek Programı**: 2209-B - Üniversite Öğrencileri Sanayiye Yönelik Araştırma Projeleri Desteği Programı
 - **Yürütüleceği Kurum**: Türk Telekom
 - **Proje Süresi**: 12 Ay
 
-## 📄 Lisans
+## Lisans
 
 Bu proje TÜBİTAK 2209-B programı kapsamında geliştirilmiştir.
