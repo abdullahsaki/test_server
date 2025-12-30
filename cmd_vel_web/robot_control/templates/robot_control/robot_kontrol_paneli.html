@@ -362,8 +362,8 @@
                 <div class="col-md-12">
                     <div class="card mt-3">
                         <div class="card-body">
-                            <h5 class="card-title">LoRa'dan Gelen Son Mesaj</h5>
-                            <pre id="rawLoRaRealtime" class="bg-light p-3 rounded">-</pre>
+                            <h5 class="card-title">LoRa'dan Gelen Mesajlar</h5>
+                            <div id="rawLoRaRealtime" class="bg-light p-3 rounded" style="max-height: 70vh; overflow-y: auto; font-family: monospace; font-size: 0.9rem; white-space: pre-wrap; word-wrap: break-word;">-</div>
                         </div>
                     </div>
                 </div>
@@ -623,6 +623,10 @@
             document.getElementById('wifiStatus').innerHTML = 'Yükleniyor...';
             document.getElementById('robotStatus').innerHTML = 'Hazır';
 
+            // LoRa mesaj geçmişi için değişkenler
+            let lastProcessedMessage = null;
+            let messageHistory = [];
+
             // LoRa'dan gelen son mesajı periyodik olarak güncelle
             function updateLastLoRaMessage() {
                 fetch("{% url 'robot_control:get_last_lora_message' %}", {
@@ -635,12 +639,23 @@
                 .then(data => {
                     if (data.status === 'success') {
                         const message = data.message || '-';
-                        // Ham Veri bölümündeki elementi güncelle
-                        const rawLoRaElement = document.getElementById('rawLoRaRealtime');
-                        if (rawLoRaElement) {
-                            rawLoRaElement.textContent = message;
+                        
+                        // Yeni mesaj geldiğinde (önceki mesajdan farklıysa) ekle
+                        if (message !== lastProcessedMessage && message !== '-' && message.trim() !== '') {
+                            const timestamp = new Date().toLocaleTimeString('tr-TR');
+                            messageHistory.push(`[${timestamp}] ${message}`);
+                            lastProcessedMessage = message;
+                            
+                            // Ham Veri bölümündeki mesaj geçmişini güncelle
+                            const rawLoRaElement = document.getElementById('rawLoRaRealtime');
+                            if (rawLoRaElement) {
+                                rawLoRaElement.textContent = messageHistory.join('\n');
+                                // Otomatik olarak en alta scroll yap
+                                rawLoRaElement.scrollTop = rawLoRaElement.scrollHeight;
+                            }
                         }
-                        // Ana sayfadaki Bilgi bölümündeki elementi güncelle
+                        
+                        // Ana sayfadaki Bilgi bölümündeki elementi güncelle (sadece son mesaj)
                         const loraMessageInfoElement = document.getElementById('loraMessageInfo');
                         if (loraMessageInfoElement) {
                             loraMessageInfoElement.textContent = message;
