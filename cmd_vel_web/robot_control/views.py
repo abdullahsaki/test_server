@@ -39,3 +39,10 @@ def send_command(request):
     command = request.POST.get('command')
     lora_client.send_command(command)
     return JsonResponse({'status': 'success', 'message': f'{command} komutu gönderildi'})
+
+@csrf_exempt
+@login_required(login_url='robot_control:login')
+def get_last_lora_message(request):
+    """LoRa'dan gelen son mesajı döndürür"""
+    last_message = lora_client.get_last_message()
+    return JsonResponse({'status': 'success', 'message': last_message})

@@ -221,24 +221,10 @@
                     <div class="card">
                         <div class="card-body position-relative">
                             <h5 class="card-title">Bilgi</h5>
-                            <div class="row justify-content-center align-items-center">
-                                <div class="col-md-10">
-                                    <div class="text-center">
-                                        <h6 class="mb-2">SignalLevel</h6>
-                                        <div class="text-muted small">
-                                            <span>ts: <span id="tsValue">-</span></span>
-                                            <span class="mx-2">|</span>
-                                            <span>id: <span id="idValue">-</span></span>
-                                            <span class="mx-2">|</span>
-                                            <span>ap: <span id="apValue">-</span></span>
-                                            <span class="mx-2">|</span>
-                                            <span>f: <span id="fValue">-</span></span>
-                                            <span class="mx-2">|</span>
-                                            <span>lq: <span id="lqValue">-</span></span>
-                                            <span class="mx-2">|</span>
-                                            <span>sl: <span id="slValue">-</span></span>
-                                        </div>
-                                    </div>
+                            <div class="row mt-3">
+                                <div class="col-12">
+                                    <h6 class="mb-2">LoRa Mesajı</h6>
+                                    <pre id="loraMessageInfo" class="bg-light p-3 rounded mb-0" style="font-size: 0.9rem; white-space: pre-wrap; word-wrap: break-word;">-</pre>
                                 </div>
                             </div>
                             <div class="row mt-2">
@@ -636,6 +622,39 @@
             document.getElementById('batteryStatus').innerHTML = 'Yükleniyor...';
             document.getElementById('wifiStatus').innerHTML = 'Yükleniyor...';
             document.getElementById('robotStatus').innerHTML = 'Hazır';
+
+            // LoRa'dan gelen son mesajı periyodik olarak güncelle
+            function updateLastLoRaMessage() {
+                fetch("{% url 'robot_control:get_last_lora_message' %}", {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        const message = data.message || '-';
+                        // Ham Veri bölümündeki elementi güncelle
+                        const rawLoRaElement = document.getElementById('rawLoRaRealtime');
+                        if (rawLoRaElement) {
+                            rawLoRaElement.textContent = message;
+                        }
+                        // Ana sayfadaki Bilgi bölümündeki elementi güncelle
+                        const loraMessageInfoElement = document.getElementById('loraMessageInfo');
+                        if (loraMessageInfoElement) {
+                            loraMessageInfoElement.textContent = message;
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('LoRa mesajı alınamadı:', error);
+                });
+            }
+
+            // İlk yüklemede ve her 1 saniyede bir güncelle
+            updateLastLoRaMessage();
+            setInterval(updateLastLoRaMessage, 1000);
         });
     </script>
 </body>
