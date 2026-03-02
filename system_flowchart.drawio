@@ -1,0 +1,114 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" version="29.2.9">
+  <diagram name="Robot Kontrol Sistemi Akış Şeması" id="flowchart">
+    <mxGraphModel dx="1188" dy="659" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="1654" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="main_panel" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;fontColor=#333333;strokeWidth=3;" value="Kontrol Arayüzü" vertex="1">
+          <mxGeometry height="40" width="200" x="560" y="480" as="geometry" />
+        </mxCell>
+        <mxCell id="Ue-Tfxwb53l9w8rBiXze-2" edge="1" parent="1" source="section_home" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=3;" target="command_trigger" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="section_home" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=center;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;strokeWidth=3;" value="Ana Sayfa&lt;br&gt;- Robot Durumu&lt;br&gt;- Test Başlatma" vertex="1">
+          <mxGeometry height="60" wdth="150" x="130" y="620" as="geometry" />
+        </mxCell>
+        <mxCell id="Ue-Tfxwb53l9w8rBiXze-1" edge="1" parent="1" source="section_teleop" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=3;" target="command_trigger" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="section_teleop" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;align=center;fontColor=#333333;strokeWidth=3;" value="Manuel Kontrol&lt;br&gt;- İleri/Geri/Sol/Sağ/Dur Butonu" vertex="1">
+          <mxGeometry height="60" width="200" x="320" y="620" as="geometry" />
+        </mxCell>
+        <mxCell id="section_raw" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;align=center;fontColor=#333333;strokeWidth=3;" value="Ham Veri&lt;br&gt;- LoRa Mesaj Geçmişi" vertex="1">
+          <mxGeometry height="60" width="200" x="560" y="620" as="geometry" />
+        </mxCell>
+        <mxCell id="section_reports" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;align=center;fontColor=#333333;strokeWidth=3;" value="Raporlar&lt;br&gt;- Test Raporları" vertex="1">
+          <mxGeometry height="60" width="180" x="820" y="620" as="geometry" />
+        </mxCell>
+        <mxCell id="section_about" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;align=center;fontColor=#333333;strokeWidth=3;" value="Hakkında&lt;br&gt;- Proje Bilgileri" vertex="1">
+          <mxGeometry height="60" width="160" x="1040" y="620" as="geometry" />
+        </mxCell>
+        <mxCell id="Ue-Tfxwb53l9w8rBiXze-4" edge="1" parent="1" source="command_trigger" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=3;" target="Ue-Tfxwb53l9w8rBiXze-3" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="command_trigger" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;strokeWidth=3;" value="Kullanıcı Komut Verir&#xa;(Buton Tıklama)" vertex="1">
+          <mxGeometry height="60" width="280" x="160" y="797" as="geometry" />
+        </mxCell>
+        <mxCell id="command_types" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1" value="Komut Türleri:" vertex="1">
+          <mxGeometry height="30" width="120" x="80" y="1320" as="geometry" />
+        </mxCell>
+        <mxCell id="cmd_www" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;align=left;" value="www - İleri" vertex="1">
+          <mxGeometry height="40" width="120" x="80" y="1360" as="geometry" />
+        </mxCell>
+        <mxCell id="cmd_xxx" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;align=left;" value="xxx - Geri" vertex="1">
+          <mxGeometry height="40" width="120" x="220" y="1360" as="geometry" />
+        </mxCell>
+        <mxCell id="cmd_aaa" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;align=left;" value="aaa - Sol" vertex="1">
+          <mxGeometry height="40" width="120" x="360" y="1360" as="geometry" />
+        </mxCell>
+        <mxCell id="cmd_ddd" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;align=left;" value="ddd - Sağ" vertex="1">
+          <mxGeometry height="40" width="120" x="500" y="1360" as="geometry" />
+        </mxCell>
+        <mxCell id="cmd_sss" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;align=left;" value="sss - Dur" vertex="1">
+          <mxGeometry height="40" width="120" x="640" y="1360" as="geometry" />
+        </mxCell>
+        <mxCell id="cmd_launch" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;align=left;" value="robot_launch" vertex="1">
+          <mxGeometry height="40" width="140" x="780" y="1360" as="geometry" />
+        </mxCell>
+        <mxCell id="cmd_test" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;align=left;" value="rota_testi /&#xa;roaming_testi /&#xa;steering_testi" vertex="1">
+          <mxGeometry height="40" width="140" x="940" y="1360" as="geometry" />
+        </mxCell>
+        <mxCell id="cmd_stop" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;align=left;" value="testi_bitir" vertex="1">
+          <mxGeometry height="40" width="120" x="1100" y="1360" as="geometry" />
+        </mxCell>
+        <mxCell id="edge7" edge="1" parent="1" source="main_panel" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=3;" target="section_home" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="440" y="550" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge8" edge="1" parent="1" source="main_panel" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=3;" target="section_teleop" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="510" y="580" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge9" edge="1" parent="1" source="main_panel" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=3;" target="section_raw" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="580" y="580" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge10" edge="1" parent="1" source="main_panel" style="endArrow=classic;html=1;rounded=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=3;" target="section_reports" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="590" y="480" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge11" edge="1" parent="1" source="main_panel" style="endArrow=classic;html=1;rounded=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=3;" target="section_about" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="580" y="480" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="Ue-Tfxwb53l9w8rBiXze-9" edge="1" parent="1" source="Ue-Tfxwb53l9w8rBiXze-3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.403;exitY=0.987;exitDx=0;exitDy=0;entryX=0.404;entryY=-0.005;entryDx=0;entryDy=0;entryPerimeter=0;exitPerimeter=0;fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=3;" target="Ue-Tfxwb53l9w8rBiXze-5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="Ue-Tfxwb53l9w8rBiXze-11" edge="1" parent="1" source="Ue-Tfxwb53l9w8rBiXze-3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="100" y="650" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="Ue-Tfxwb53l9w8rBiXze-3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;strokeWidth=3;" value="LoRa Modülü (Kontrol İstasyonu)" vertex="1">
+          <mxGeometry height="60" width="280" x="160" y="900" as="geometry" />
+        </mxCell>
+        <mxCell id="Ue-Tfxwb53l9w8rBiXze-8" edge="1" parent="1" source="Ue-Tfxwb53l9w8rBiXze-5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.605;entryY=1.023;entryDx=0;entryDy=0;entryPerimeter=0;exitX=0.605;exitY=0.022;exitDx=0;exitDy=0;exitPerimeter=0;fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=3;" target="Ue-Tfxwb53l9w8rBiXze-3">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="330" y="1030" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="Ue-Tfxwb53l9w8rBiXze-5" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;strokeWidth=3;" value="LoRa Modülü (Robot Raspberry)" vertex="1">
+          <mxGeometry height="60" width="280" x="160" y="1040" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
+
+
+

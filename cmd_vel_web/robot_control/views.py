@@ -37,8 +37,17 @@ def home(request):
 @login_required(login_url='robot_control:login')
 def send_command(request):
     command = request.POST.get('command')
+    if not command:
+        return JsonResponse({'status': 'error', 'message': 'Komut gerekli'}, status=400)
     lora_client.send_command(command)
     return JsonResponse({'status': 'success', 'message': f'{command} komutu gönderildi'})
+
+@csrf_exempt
+@login_required(login_url='robot_control:login')
+def reset_communication(request):
+    """İletişim reset: cevap gelmemiş olsa bile karşıya bir mesaj gönderir (Raspberry beklemeden çıksın)."""
+    ok = lora_client.reset_communication()
+    return JsonResponse({'status': 'success' if ok else 'error', 'message': 'İletişim reset gönderildi' if ok else 'Port kapalı'})
 
 @csrf_exempt
 @login_required(login_url='robot_control:login')

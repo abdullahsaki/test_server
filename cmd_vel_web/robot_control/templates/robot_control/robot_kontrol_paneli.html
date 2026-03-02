@@ -234,6 +234,13 @@
                                     </div>
                                 </div>
                             </div>
+                            <div class="row mt-3">
+                                <div class="col-12 text-center">
+                                    <button type="button" id="resetCommBtn" class="btn btn-outline-secondary btn-sm" title="Raspberry cevap beklemede takılı kaldıysa iletişimi sıfırla">
+                                        <i class="fas fa-sync-alt me-1"></i> İletişim reset
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -485,7 +492,7 @@
             });
 
             showSection('home');
-            const buttonIdToCommand = { forward: 'www', backward: 'xxx', left: 'aaa', right: 'ddd', stop: 'sss' };
+            const buttonIdToCommand = { forward: 'ww', backward: 'xx', left: 'aa', right: 'dd', stop: 'ss' };
             Object.keys(buttonIdToCommand).forEach(buttonId => {
                 const button = document.getElementById(buttonId);
                 if (!button) return;
@@ -509,6 +516,31 @@
                     });
                 });
             });
+
+            const resetCommBtn = document.getElementById('resetCommBtn');
+            if (resetCommBtn) {
+                resetCommBtn.addEventListener('click', function() {
+                    fetch("{% url 'robot_control:reset_communication' %}", {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': '{{ csrf_token }}' },
+                        body: ''
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            console.log('[LoRa] İletişim reset gönderildi');
+                            if (typeof resetCommBtn.setAttribute === 'function') {
+                                const origText = resetCommBtn.innerHTML;
+                                resetCommBtn.innerHTML = '<i class="fas fa-check me-1"></i> Gönderildi';
+                                setTimeout(function() { resetCommBtn.innerHTML = origText; }, 1500);
+                            }
+                        } else {
+                            console.warn('[LoRa] Reset:', data.message);
+                        }
+                    })
+                    .catch(error => console.error('Reset hatası:', error));
+                });
+            }
 
             const modemModels = {
                 'zyxel': [

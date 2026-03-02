@@ -9,5 +9,6 @@ urlpatterns = [
     path('login/', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),
     path('send_command/', views.send_command, name='send_command'),
+    path('reset_communication/', views.reset_communication, name='reset_communication'),
     path('get_last_lora_message/', views.get_last_lora_message, name='get_last_lora_message'),
 ]
