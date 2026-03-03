@@ -5,7 +5,40 @@ import json
 # Sıralı protokol: Raspberry mesaj gönderir → biz alırız (parse ederiz) → 1 sn sonra biz mesajımızı göndeririz (komut tam içeriği).
 # İlk açılışta: arayüz karşıdan cevap gelene kadar saniyede bir mesaj göndermeyi dener. İlk cevap geldikten sonra karşıdan cevap gelene kadar bekler.
 # İletişim reset: cevap gelmemiş olsa bile karşıya bir mesaj gönderir (Raspberry beklemeden çıksın).
+# LoRa 240 byte: Raspberry kısa anahtar gönderir (t,s,i,b,g,r,x,y,c,n,o,p,m,e); burada uzun anahtarlara çeviriyoruz.
 LORA_INTERVAL = 1.0
+
+# Kısa -> uzun anahtar eşlemesi (Raspberry compact format)
+_COMPACT_TO_LONG = {
+    "t": "time", "s": "state", "i": "ssid", "b": "bssid", "g": "signal", "r": "rssi",
+    "x": "rx", "y": "tx", "c": "channel", "n": "band", "o": "radio", "p": "cpu", "m": "ram", "e": "event",
+}
+
+
+def expand_compact_status(parsed):
+    """LoRa'dan gelen kısa formatı (t, s, i, ...) uzun anahtarlara (time, state, ssid, ...) çevirir."""
+    if not parsed or "time" in parsed:
+        return parsed
+    out = {}
+    for short, long_key in _COMPACT_TO_LONG.items():
+        if short not in parsed:
+            continue
+        v = parsed[short]
+        if long_key == "state":
+            out[long_key] = "connected" if v == "c" else "disconnected"
+        elif long_key == "signal":
+            out[long_key] = f"{v}%" if isinstance(v, (int, float)) else str(v)
+        elif long_key == "rssi":
+            out[long_key] = f"{int(v)} dBm" if isinstance(v, (int, float)) else str(v)
+        elif long_key in ("rx", "tx"):
+            out[long_key] = f"{int(v)} Mbps" if isinstance(v, (int, float)) else str(v)
+        elif long_key == "band":
+            out[long_key] = "5 GHz" if v == "5G" else ("2.4 GHz" if v == "2.4" else str(v))
+        elif long_key in ("cpu", "ram"):
+            out[long_key] = f"{v}%" if isinstance(v, (int, float)) else str(v)
+        else:
+            out[long_key] = v
+    return out
 
 class LoRaClient:
     def __init__(self, port: str = '/dev/ttyUSB0', baudrate: int = 9600):
@@ -122,8 +155,8 @@ class LoRaClient:
                         try:
                             parsed = json.loads(message)
                             with self._lock:
-                                self.last_parsed_status = parsed
-                            print(f"[LoRa] RX (JSON): state={parsed.get('state','?')} ssid={parsed.get('ssid','?')} ...")
+                                self.last_parsed_status = expand_compact_status(parsed)
+                            print(f"[LoRa] RX (JSON): state={parsed.get('state', parsed.get('s','?'))} ssid={parsed.get('ssid', parsed.get('i','?'))} ...")
                         except json.JSONDecodeError as e:
                             print(f"[LoRa] RX (ham): '{message[:60]}...' (JSON parse hatası: {e})")
                     else:

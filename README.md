@@ -1,131 +1,170 @@
-# LoRa Tabanlı Robotik Test Sistemi
+# LoRa Tabanlı Robotik WiFi Test Sistemi
 
 ## Proje Hakkında
 
-Bu proje, LoRa teknolojisi ile uzun menzilli iletişim sağlayarak mobil robot sistemini kontrol etmeyi ve robotun otonom görev yürütme yeteneğini kullanarak WiFi testlerinin otonom olarak yapılmasını amaçlamaktadır.
+Bu proje, LoRa teknolojisi ile uzun menzilli iletişim kullanarak mobil robot sistemini kontrol etmeyi ve robotun otonom görev yürütme yeteneğiyle WiFi testlerinin otonom yapılmasını amaçlamaktadır. Sistem üç katmandan oluşur: **Windows PC** (Wi-Fi verisi), **Raspberry Pi** (köprü + ROS2 robot), **Ubuntu laptop** (web arayüzü).
 
-## Admin Paneli Erişimi
+---
 
-### Admin Giriş Bilgileri:
-- **URL**: http://127.0.0.1:8000/admin/
-- **Kullanıcı Adı**: `admin`
-- **Şifre**: `turktelekom`
+## Sistem Mimarisi
 
-### Robot Kontrol Paneli:
-- **URL**: http://127.0.0.1:8000/robot/
-- **Login**: http://127.0.0.1:8000/robot/login/
+```
+[Windows PC]  ---- TCP (Ethernet) ---->  [Raspberry Pi]  ---- LoRa (seri) ---->  [Ubuntu Laptop]
+     |                    |                        |                                  |
+  Wi-Fi durumu        Port 5001              JSON (Wi-Fi) / Komutlar            Web arayüzü
+  (key=value satır)   Raspberry IP           ww, ss, robot_launch, testler       /robot/
+                     (192.168.1.11)         /dev/ttyAMA0 9600                   /dev/ttyUSB0 9600
+```
 
-### Login Kullanıcısı:
-- **Kullanıcı Adı**: `admin`
-- **Şifre**: `turktelekom`
+- **Windows:** Wi-Fi durumunu toplar, TCP ile Raspberry’ye satır satır gönderir.
+- **Raspberry Pi:** TCP’den gelen veriyi JSON’a çevirip LoRa ile Ubuntu’ya gönderir; LoRa’dan gelen komutlarla robotu (ROS2 `/cmd_vel`) ve test launch’larını yönetir. Sıralı protokol: karşıdan mesaj gelene kadar yeni mesaj göndermez.
+- **Ubuntu:** Django web arayüzü; LoRa ile Raspberry’den Wi-Fi JSON alır, komut gönderir (hareket, robot başlat, test başlat/bitir). İletişim reset butonu ile kilitlenme çözülür.
 
-## Kurulum
+Detaylı iletişim ve mesaj uyumu için: **[ILETISIM_VE_MESAJ_RAPORU.md](ILETISIM_VE_MESAJ_RAPORU.md)**
 
-### Gereksinimler:
+---
+
+## Hızlı Erişim
+
+### Robot Kontrol Paneli
+- **URL:** http://127.0.0.1:8000/robot/
+- **Giriş:** http://127.0.0.1:8000/robot/login/
+- **Kullanıcı:** `admin` / **Şifre:** `turktelekom`
+
+### Admin Paneli
+- **URL:** http://127.0.0.1:8000/admin/
+- **Kullanıcı:** `admin` / **Şifre:** `turktelekom`
+
+---
+
+## Kurulum ve Çalıştırma
+
+### Gereksinimler
 - Python 3.8+
-- PostgreSQL
-- LoRa Modülü (E22 900T22D)
+- PostgreSQL (veya proje ayarına göre SQLite)
+- LoRa modülü (E22 900T22D veya uyumlu); Raspberry’de `/dev/ttyAMA0`, Ubuntu’da `/dev/ttyUSB0`
 
-### Kurulum Adımları:
+### 1. Ubuntu – Web Arayüzü (cmd_vel_web)
+
 ```bash
-# Bağımlılıkları yükle
+cd cmd_vel_web
 pip install -r requirements.txt
-
-# Veritabanı migration'larını uygula
-python3 manage.py migrate
-
-# Superuser (yönetici) kullanıcısı oluştur
-python3 manage.py createsuperuser
-
-# Sunucuyu başlat
-python3 manage.py runserver
+python manage.py migrate
+python manage.py createsuperuser   # İlk kurulumda
+python manage.py runserver
 ```
 
-## LoRa Modülü Bağlantısı
+Tarayıcıda http://127.0.0.1:8000/robot/ adresine gidin. LoRa modülü USB’de ise `/dev/ttyUSB0` (9600 baud) kullanılır; yoksa uygulama dummy modda çalışır.
 
-LoRa modülünüzü `/dev/ttyUSB0` portuna bağlayın. Farklı bir port kullanıyorsanız, `lora_client.py` dosyasındaki port ayarını değiştirin.
+### 2. Raspberry Pi – LoRa Bridge (win_rapbery)
 
-```pythonS
-# lora_client.py içinde
-lora_client = LoRaClient(port='/dev/ttyUSB0', baudrate=115200)
+Raspberry’de ROS2 kurulu olmalı. Ethernet IP’yi 192.168.1.11 yapın (veya Windows tarafındaki `server_ip`’yi buna göre ayarlayın).
+
+```bash
+cd win_rapbery
+# ROS2 ortamını aktive edin, ardından:
+python3 raspberry_lora_bridge.py
 ```
 
-## Veritabanı
+- TCP sunucu: `0.0.0.0:5001`
+- LoRa: `/dev/ttyAMA0`, 9600 baud
 
-### PostgreSQL Ayarları:
-- **Veritabanı**: `wifi_tester`
-- **Kullanıcı**: `abdullah`
-- **Şifre**: `a`
-- **Host**: `localhost`
-- **Port**: `5432`
+### 3. Windows PC – Wi-Fi Verisi (win_rapbery)
 
-## Önemli Notlar
+Windows’ta Python 3, `pyfiglet`, `psutil` kurulu olmalı. Raspberry ile aynı ağda (Ethernet) ve Raspberry IP’si 192.168.1.11 olmalı.
 
-### Admin Şifresi:
-- **Kullanıcı**: `admin`
-- **Şifre**: `turktelekom`
+```bash
+cd win_rapbery
+python functionBase_wifi.py
+```
+
+Veya sadece TCP gönderimi için:
+
+```python
+from functionBase_wifi import WifiStatusTcpSender
+sender = WifiStatusTcpSender(server_ip='192.168.1.11', server_port=5001, interval=1.0)
+sender.run_loop(duration=None)  # Ctrl+C ile durdur
+```
+
+---
 
 ## Proje Yapısı
 
 ```
 test_server/
-├── cmd_vel_web/                    # Django proje klasörü
-│   ├── cmd_vel_web/                # Django proje ayarları
-│   │   ├── __init__.py
-│   │   ├── settings.py            # Proje ayarları
-│   │   ├── urls.py                # Ana URL yapılandırması
-│   │   ├── asgi.py
-│   │   └── wsgi.py
-│   ├── manage.py                   # Django yönetim scripti
-│   ├── db.sqlite3                  # SQLite veritabanı
-│   └── robot_control/              # Ana Django uygulaması
-│       ├── __init__.py
-│       ├── admin.py                # Admin panel ayarları
-│       ├── models.py               # Veritabanı modelleri
-│       ├── views.py                # Django view'ları
-│       ├── urls.py                 # Uygulama URL'leri
-│       ├── lora_client.py          # LoRa iletişim modülü
-│       ├── migrations/             # Veritabanı migration'ları
-│       ├── static/
-│       │   └── robot_control/
-│       │       └── images/
-│       │           └── ttkom_logo.svg
-│       └── templates/
-│           ├── registration/
-│           │   └── kullanici_giris.html
-│           └── robot_control/
-│               └── robot_kontrol_paneli.html
-├── requirements.txt                # Python bağımlılıkları
-└── README.md                       # Proje dokümantasyonu
+├── cmd_vel_web/                      # Django web projesi (Ubuntu)
+│   ├── cmd_vel_web/                  # Ayarlar, urls
+│   ├── manage.py
+│   └── robot_control/                # Robot arayüzü uygulaması
+│       ├── views.py                  # send_command, reset_communication, get_last_lora_message
+│       ├── urls.py
+│       ├── lora_client.py            # LoRa istemcisi (seri, sıralı protokol)
+│       ├── templates/robot_control/
+│       │   └── robot_kontrol_paneli.html
+│       └── static/
+├── win_rapbery/                      # Windows + Raspberry kodları
+│   ├── functionBase_wifi.py          # Windows: Wi-Fi okuma, TCP gönderimi (WifiStatusTcpSender)
+│   └── raspberry_lora_bridge.py      # Raspberry: TCP sunucu, LoRa köprü, ROS2 cmd_vel
+├── ILETISIM_VE_MESAJ_RAPORU.md       # İletişim ve mesaj formatları detay raporu
+├── requirements.txt
+└── README.md
 ```
 
-## Özellikler
+---
 
-- LoRa tabanlı uzun menzilli iletişim
-- Web tabanlı robot kontrol arayüzü
-- Gerçek zamanlı sensör veri toplama (IMU, Lidar, RSSI, pil durumu)
-- Mobil kontrol (ileri, geri, sağ, sol hareket komutları)
-- PostgreSQL veritabanı
-- Admin paneli ve kullanıcı yönetimi
+## LoRa ve Port Ayarları
+
+| Cihaz      | Seri port       | Baudrate | Amaç                    |
+|------------|-----------------|----------|-------------------------|
+| Raspberry  | `/dev/ttyAMA0`  | 9600     | Ubuntu ile sıralı iletişim |
+| Ubuntu     | `/dev/ttyUSB0`  | 9600     | Arayüz → Raspberry komutları, Wi-Fi JSON alımı |
+
+Farklı port kullanıyorsanız:
+- **Ubuntu:** `cmd_vel_web/robot_control/lora_client.py` içinde `LoRaClient('/dev/ttyUSB0', 9600)` satırını güncelleyin.
+- **Raspberry:** `win_rapbery/raspberry_lora_bridge.py` içinde `LORA_PORT` ve `LORA_BAUDRATE` değişkenlerini güncelleyin.
+
+---
+
+## Arayüz Özellikleri
+
+- **Manuel kontrol:** İleri, geri, sol, sağ, dur (ww, xx, aa, dd, ss)
+- **Robot başlat:** ROS2 robot launch
+- **Testler:** Rota / Roaming / Steering testi başlat, Testi Bitir
+- **LoRa mesajı:** Son gelen mesaj (ham) ve ham veri geçmişi
+- **İletişim reset:** Karşıdan cevap gelmeden tek seferlik mesaj gönderir; kilitlenme durumunda kullanılır
+
+---
+
+## Veritabanı (Django)
+
+Proje SQLite veya PostgreSQL kullanabilir. Ayarlar `cmd_vel_web/cmd_vel_web/settings.py` içindedir. Örnek PostgreSQL:
+
+- **Veritabanı:** `wifi_tester`
+- **Kullanıcı:** `abdullah`
+- **Şifre:** `a`
+- **Host:** `localhost`
+- **Port:** `5432`
+
+---
 
 ## Proje Ekibi
 
-- **Elif Aykırı** - Fizik Mühendisliği
-- **Abdullah Saki** - Elektrik Elektronik Mühendisliği  
-- **Kerem Odabaş** - Elektrik Elektronik Mühendisliği
-- **Şevin Kaya** - Elektrik Elektronik Mühendisliği
+- **Elif Aykırı** – Fizik Mühendisliği
+- **Abdullah Saki** – Elektrik-Elektronik Mühendisliği
+- **Kerem Odabaş** – Elektrik-Elektronik Mühendisliği
+- **Şevin Kaya** – Elektrik-Elektronik Mühendisliği
 
-## Akademik Danışmanlar
+## Danışmanlar
 
-- **Akademik Danışman**: Doç. Dr. Haluk Bayram
-- **Sanayi Danışmanı**: Dr. ad. Samet Özabacı (Türk Telekom)
+- **Akademik Danışman:** Doç. Dr. Haluk Bayram
+- **Sanayi Danışmanı:** Dr. ad. Samet Özabacı (Türk Telekom)
 
-## Proje Bilgileri
+## Proje Bilgisi
 
-- **Proje Başlığı**: Robotik WiFi Test Sİstemi
-- **Destek Programı**: 2209-B - Üniversite Öğrencileri Sanayiye Yönelik Araştırma Projeleri Desteği Programı
-- **Yürütüleceği Kurum**: Türk Telekom
-- **Proje Süresi**: 12 Ay
+- **Proje:** Robotik WiFi Test Sistemi
+- **Program:** TÜBİTAK 2209-B – Üniversite Öğrencileri Sanayiye Yönelik Araştırma Projeleri
+- **İş ortağı:** Türk Telekom
+- **Süre:** 12 ay
 
 ## Lisans
 

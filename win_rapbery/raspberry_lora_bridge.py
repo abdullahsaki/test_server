@@ -22,6 +22,7 @@ TCP_PORT = 5001
 LORA_PORT = "/dev/ttyAMA0"
 LORA_BAUDRATE = 9600
 LORA_INTERVAL = 1.0  # Her iki cihazda da 1 saniyede bir işlem
+LORA_MAX_BYTES = 240  # LoRa paket boyut sınırı (byte)
 
 def parse_windows_status_line(line):
     """Windows WifiStatusTcpSender satırını parse edip dict döndürür. JSON ile LoRa'ya gönderilir."""
@@ -31,6 +32,67 @@ def parse_windows_status_line(line):
         if "=" in part:
             k, v = part.split("=", 1)
             out[k.strip()] = v.strip()
+    return out
+
+
+def compact_status_for_lora(obj):
+    """
+    Parse edilmiş Windows durumunu LoRa 240 byte sınırına uygun kısa formata çevirir.
+    Kısa anahtarlar: t=time, s=state, i=ssid, b=bssid, g=signal, r=rssi, x=rx, y=tx,
+    c=channel, n=band, o=radio, p=cpu, m=ram, e=event
+    """
+    def num(s, default=0):
+        try:
+            return float(str(s).replace("%", "").replace(" dBm", "").replace(" Mbps", "").strip())
+        except (ValueError, TypeError):
+            return default
+
+    out = {}
+    if "time" in obj:
+        raw = obj["time"]
+        parts = raw.split()
+        for p in parts:
+            if len(p) == 8 and ":" in p and p.count(":") == 2:
+                out["t"] = p
+                break
+        if "t" not in out:
+            out["t"] = raw[-8:] if len(raw) >= 8 else raw
+    if "state" in obj:
+        s = obj["state"].strip().lower()
+        out["s"] = "c" if s == "connected" else "d"
+    if "ssid" in obj:
+        out["i"] = (obj["ssid"].strip() or "")[:24]
+    if "bssid" in obj:
+        out["b"] = (obj["bssid"] or "").strip()
+    if "signal" in obj:
+        out["g"] = num(obj["signal"], 0)
+    if "rssi" in obj:
+        out["r"] = num(obj["rssi"], 0)
+    if "rx" in obj:
+        out["x"] = num(obj["rx"], 0)
+    if "tx" in obj:
+        out["y"] = num(obj["tx"], 0)
+    if "channel" in obj:
+        out["c"] = num(obj["channel"], 0)
+    if "band" in obj:
+        b = (obj["band"] or "").replace(" GHz", "").replace("*", "").strip()
+        out["n"] = "5G" if b == "5" else ("2.4" if b == "2.4" else b[:4])
+    if "radio" in obj:
+        r = (obj["radio"] or "").lower()
+        if "ax" in r:
+            out["o"] = "ax"
+        elif "ac" in r:
+            out["o"] = "ac"
+        elif "n" in r:
+            out["o"] = "n"
+        else:
+            out["o"] = r[-2:] if len(r) >= 2 else r
+    if "cpu" in obj:
+        out["p"] = num(obj["cpu"], 0)
+    if "ram" in obj:
+        out["m"] = num(obj["ram"], 0)
+    if "event" in obj:
+        out["e"] = obj["event"].strip()
     return out
 
 
@@ -282,7 +344,7 @@ class RaspberryLoRaBridgeNode(Node):
                 self.get_logger().warn(f"✗ LoRa okuma hatası: {e}")
     
     def send_from_buffer(self):
-        """Buffer'daki en son veriyi JSON string olarak LoRa'ya gönder; karşıdan mesaj gelene kadar tekrar gönderme."""
+        """Buffer'daki en son veriyi 240 byte sınırına uygun kısa JSON olarak LoRa'ya gönder."""
         if self.lora_waiting_reply:
             return
         with self.buffer_lock:
@@ -290,13 +352,23 @@ class RaspberryLoRaBridgeNode(Node):
                 return
             data_line = self.data_buffer[-1]
             self.data_buffer.clear()
-        # Windows satırını dict'e çevirip JSON string olarak gönder (Ubuntu tarafında parse edilecek)
         try:
             obj = parse_windows_status_line(data_line)
-            json_str = json.dumps(obj, ensure_ascii=False)
+            compact = compact_status_for_lora(obj)
+            json_str = json.dumps(compact, ensure_ascii=False)
+            # LoRa 240 byte sınırı: payload + \n dahil 240'ı geçmesin
+            max_payload = LORA_MAX_BYTES - 1  # 1 = newline
+            while len(json_str.encode("utf-8")) > max_payload and "i" in compact:
+                # SSID'yi kısalt (i alanı)
+                compact["i"] = compact["i"][:-1] if len(compact["i"]) > 1 else ""
+                json_str = json.dumps(compact, ensure_ascii=False)
+                if not compact["i"]:
+                    break
         except Exception as e:
             self.get_logger().warn(f"JSON dönüşüm hatası, ham gönderim: {e}")
-            json_str = data_line
+            max_payload = LORA_MAX_BYTES - 1
+            b = data_line.encode("utf-8")
+            json_str = b[:max_payload].decode("utf-8", errors="ignore") if len(b) > max_payload else data_line
         self.send_to_lora(json_str)
         self.lora_waiting_reply = True
     
