@@ -3,6 +3,8 @@
 Raspberry Pi Birleşik LoRa Bridge
 1. Windows PC'den Ethernet (TCP) üzerinden veri al → JSON stringe çevir → LoRa ile Ubuntu'ya sıralı gönder
 2. LoRa'dan Ubuntu'dan gelen mesajı bekle (komut tam içeriği); mesaj gelmeden yeni mesaj gönderme
+3. /battery_state ROS2 topiğinden batarya yüzdesini al → LoRa ile Windows/RPi batarya bilgisiyle birlikte gönder
+
 Sıralı iletişim: RPi mesaj gönderir → Ubuntu mesajı alır → 1 sn sonra Ubuntu kendi mesajını gönderir →
 RPi o mesajı alır → RPi yeni mesaj gönderir. Her iki tarafta 1 saniyede bir işlem.
 """
@@ -13,10 +15,10 @@ import sys
 import subprocess
 import threading
 import json
-import psutil
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
+from sensor_msgs.msg import BatteryState
 
 # Konfigürasyon
 TCP_PORT = 5001
@@ -102,20 +104,6 @@ def compact_status_for_lora(obj):
     return out
 
 
-def get_rpi_battery_percent():
-    """
-    Raspberry Pi üzerinde pil yüzdesini döndürmeye çalışır.
-    Pil bilgisi yoksa None döner.
-    """
-    try:
-        batt = psutil.sensors_battery()
-        if not batt or batt.percent is None:
-            return None
-        return batt.percent
-    except Exception:
-        return None
-
-
 # Robot kontrol parametreleri
 LIN_VEL_STEP_SIZE = 0.05
 ANG_VEL_STEP_SIZE = 0.1
@@ -160,12 +148,20 @@ class RaspberryLoRaBridgeNode(Node):
             raise e
         
         # =======================================================
-        # ROS2 Publisher (Robot Kontrolü için)
+        # ROS2 Publisher / Subscriber
         # =======================================================
         self.cmd_vel_pub = self.create_publisher(Twist, 'cmd_vel', 10)
         self.target_lin = 0.0
         self.target_ang = 0.0
         self.twist_msg = Twist()
+        # /battery_state topiğinden gelen batarya yüzdesi (0–100 arası float)
+        self.rpi_batt_percent = None
+        self.batt_sub = self.create_subscription(
+            BatteryState,
+            '/battery_state',
+            self.battery_callback,
+            10,
+        )
         
         # =======================================================
         # Launch Process Yönetimi
@@ -198,6 +194,24 @@ class RaspberryLoRaBridgeNode(Node):
         self.start_tcp_thread()
         
         self.get_logger().info("Tüm özellikler başlatıldı. Sistem hazır.")
+
+    def battery_callback(self, msg: BatteryState):
+        """ROS2 /battery_state topiğinden gelen batarya yüzdesini sakla."""
+        try:
+            perc = msg.percentage
+            if perc is None:
+                return
+            # Birçok BatteryState implementasyonunda percentage 0–1 veya 0–100 olabilir.
+            # 0–1 aralığı ise 100 ile çarp.
+            if 0.0 <= perc <= 1.0:
+                perc = perc * 100.0
+            # Geçerli aralıkta değilse dokunma
+            if perc < 0.0:
+                return
+            self.rpi_batt_percent = perc
+        except Exception:
+            # Hatalı mesaj durumunda sessizce geç
+            return
     
     def cleanup(self):
         """Kaynakları temizle"""
@@ -374,10 +388,9 @@ class RaspberryLoRaBridgeNode(Node):
             self.data_buffer.clear()
         try:
             obj = parse_windows_status_line(data_line)
-            # Raspberry kendi batarya yüzdesini de eklesin (rbatt)
-            rbatt = get_rpi_battery_percent()
-            if rbatt is not None:
-                obj["rbatt"] = f"{rbatt:.0f}%"
+            # Raspberry kendi batarya yüzdesini de eklesin (rbatt) - /battery_state topiğinden
+            if self.rpi_batt_percent is not None:
+                obj["rbatt"] = f"{self.rpi_batt_percent:.0f}%"
             compact = compact_status_for_lora(obj)
             json_str = json.dumps(compact, ensure_ascii=False)
             # LoRa 240 byte sınırı: payload + \n dahil 240'ı geçmesin
