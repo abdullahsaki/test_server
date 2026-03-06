@@ -12,7 +12,7 @@ import os
 def _format_lora_status(status: dict) -> str:
     """
     LoRa'dan gelen parse edilmiş Wi-Fi durumunu (dict) okunabilir tek satır string'e çevirir.
-    Beklenen alanlar: time, state, ssid, bssid, signal, rssi, rx, tx, channel, band, radio, cpu, ram, event
+    Beklenen alanlar: time, state, ssid, bssid, signal, rssi, rx, tx, channel, band, radio, cpu, ram, event, win_batt, rpi_batt
     """
     if not status:
         return "-"
@@ -30,6 +30,8 @@ def _format_lora_status(status: dict) -> str:
     radio = status.get("radio", "-")
     cpu = status.get("cpu", "-")
     ram = status.get("ram", "-")
+    win_batt = status.get("win_batt")
+    rpi_batt = status.get("rpi_batt")
     event = status.get("event")
 
     if event == "1":
@@ -41,12 +43,16 @@ def _format_lora_status(status: dict) -> str:
     else:
         event_str = "Olay yok"
 
+    batt_str = ""
+    if win_batt or rpi_batt:
+        batt_str = f" | Batarya (Win/RPi): {win_batt or '-'} / {rpi_batt or '-'}"
+
     readable = (
         f"Zaman: {time_str} | Durum: {state} | "
         f"SSID: {ssid} | BSSID: {bssid} | "
         f"Sinyal: {signal} ({rssi}) | Hız (Rx/Tx): {rx} / {tx} | "
         f"Kanal/Bant: {channel} / {band} | Standart: {radio} | "
-        f"Windows CPU/RAM: {cpu} / {ram} | {event_str}"
+        f"Windows CPU/RAM: {cpu} / {ram}{batt_str} | {event_str}"
     )
     return readable
 

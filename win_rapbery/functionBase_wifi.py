@@ -191,6 +191,20 @@ def getSystemInfo():
     return [str(cpuUsage), str(memoryUsage)]
 
 
+def getBatteryPercent():
+    """
+    Windows sisteminde pil yüzdesini döndürür.
+    Pil yoksa veya okunamazsa 'N/A' döner.
+    """
+    try:
+        batt = psutil.sensors_battery()
+        if not batt or batt.percent is None:
+            return "N/A"
+        return f"{batt.percent:.0f}%"
+    except Exception:
+        return "N/A"
+
+
 def writeLogsToFile(log, filename):
     file = open("./logs/"+filename, "a", encoding='utf-8')
     file.writelines(log)
@@ -557,7 +571,7 @@ class WifiStatusTcpSender:
         self.socket = None
     
     def build_status_line(self):
-        """Wi-Fi + CPU/RAM bilgisini tek satır string yapar."""
+        """Wi-Fi + CPU/RAM (+ Windows batarya) bilgisini tek satır string yapar."""
         # Wi-Fi durumu
         wlan_lines = readWlan()
         signal_info = getSignalInfo(wlan_lines)
@@ -568,6 +582,7 @@ class WifiStatusTcpSender:
         
         # Sistem durumu
         cpu_usage, ram_usage = getSystemInfo()
+        battery = getBatteryPercent()
         
         # Event tespiti (band steering=1, roaming=2)
         event_code, _ = detect_wifi_event(signal_info, self.previous_signal_data)
@@ -591,6 +606,7 @@ class WifiStatusTcpSender:
             f"radio={radio_type}",
             f"cpu={cpu_usage}%",
             f"ram={ram_usage}%",
+            f"wbatt={battery}",
         ]
         
         if event_code in (1, 2):

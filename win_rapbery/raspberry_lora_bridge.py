@@ -13,6 +13,7 @@ import sys
 import subprocess
 import threading
 import json
+import psutil
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
@@ -93,7 +94,26 @@ def compact_status_for_lora(obj):
         out["m"] = num(obj["ram"], 0)
     if "event" in obj:
         out["e"] = obj["event"].strip()
+    # Windows ve Raspberry batarya yüzdeleri (wbatt, rbatt)
+    if "wbatt" in obj:
+        out["w"] = num(obj["wbatt"], 0)
+    if "rbatt" in obj:
+        out["u"] = num(obj["rbatt"], 0)
     return out
+
+
+def get_rpi_battery_percent():
+    """
+    Raspberry Pi üzerinde pil yüzdesini döndürmeye çalışır.
+    Pil bilgisi yoksa None döner.
+    """
+    try:
+        batt = psutil.sensors_battery()
+        if not batt or batt.percent is None:
+            return None
+        return batt.percent
+    except Exception:
+        return None
 
 
 # Robot kontrol parametreleri
@@ -354,6 +374,10 @@ class RaspberryLoRaBridgeNode(Node):
             self.data_buffer.clear()
         try:
             obj = parse_windows_status_line(data_line)
+            # Raspberry kendi batarya yüzdesini de eklesin (rbatt)
+            rbatt = get_rpi_battery_percent()
+            if rbatt is not None:
+                obj["rbatt"] = f"{rbatt:.0f}%"
             compact = compact_status_for_lora(obj)
             json_str = json.dumps(compact, ensure_ascii=False)
             # LoRa 240 byte sınırı: payload + \n dahil 240'ı geçmesin

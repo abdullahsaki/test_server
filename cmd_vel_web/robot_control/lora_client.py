@@ -5,13 +5,14 @@ import json
 # Sıralı protokol: Raspberry mesaj gönderir → biz alırız (parse ederiz) → 1 sn sonra biz mesajımızı göndeririz (komut tam içeriği).
 # İlk açılışta: arayüz karşıdan cevap gelene kadar saniyede bir mesaj göndermeyi dener. İlk cevap geldikten sonra karşıdan cevap gelene kadar bekler.
 # İletişim reset: cevap gelmemiş olsa bile karşıya bir mesaj gönderir (Raspberry beklemeden çıksın).
-# LoRa 240 byte: Raspberry kısa anahtar gönderir (t,s,i,b,g,r,x,y,c,n,o,p,m,e); burada uzun anahtarlara çeviriyoruz.
+# LoRa 240 byte: Raspberry kısa anahtar gönderir (t,s,i,b,g,r,x,y,c,n,o,p,m,e,w,u); burada uzun anahtarlara çeviriyoruz.
 LORA_INTERVAL = 1.0
 
 # Kısa -> uzun anahtar eşlemesi (Raspberry compact format)
 _COMPACT_TO_LONG = {
     "t": "time", "s": "state", "i": "ssid", "b": "bssid", "g": "signal", "r": "rssi",
     "x": "rx", "y": "tx", "c": "channel", "n": "band", "o": "radio", "p": "cpu", "m": "ram", "e": "event",
+    "w": "win_batt", "u": "rpi_batt",
 }
 
 
@@ -35,6 +36,8 @@ def expand_compact_status(parsed):
         elif long_key == "band":
             out[long_key] = "5 GHz" if v == "5G" else ("2.4 GHz" if v == "2.4" else str(v))
         elif long_key in ("cpu", "ram"):
+            out[long_key] = f"{v}%" if isinstance(v, (int, float)) else str(v)
+        elif long_key in ("win_batt", "rpi_batt"):
             out[long_key] = f"{v}%" if isinstance(v, (int, float)) else str(v)
         else:
             out[long_key] = v
