@@ -365,6 +365,8 @@ class RaspberryLoRaBridgeNode(Node):
                 # Launch komutları
                 if msg == "robot_launch":
                     self.start_robot_launch(["ros2", "launch", "turtlebot3_bringup", "robot.launch.py"])
+                elif msg == "robot_bitir":
+                    self.stop_robot_launch()
                 elif msg == "rota_testi":
                     self.start_test_launch(["ros2", "launch", "turtlebot3_tests", "rota_test.launch.py"])
                 elif msg == "roaming_testi":
@@ -418,6 +420,20 @@ class RaspberryLoRaBridgeNode(Node):
         
         self.get_logger().info("Robot launch başlatılıyor...")
         self.robot_launch_process = subprocess.Popen(cmd)
+
+    def stop_robot_launch(self):
+        """Robot launch'ı durdur (LoRa'dan 'robot_bitir' komutu ile)."""
+        if self.robot_launch_process is None:
+            return
+        if self.robot_launch_process.poll() is None:
+            self.get_logger().info("Robot launch durduruluyor...")
+            self.robot_launch_process.terminate()
+            try:
+                self.robot_launch_process.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                self.get_logger().warn("Robot launch zorla öldürülüyor.")
+                self.robot_launch_process.kill()
+        self.robot_launch_process = None
     
     def start_test_launch(self, cmd):
         """Test launch dosyasını başlat (önceki test'i durdur)"""
