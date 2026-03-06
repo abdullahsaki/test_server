@@ -671,6 +671,7 @@
                 .then(data => {
                     if (data.status === 'success') {
                         const message = data.message || '-';
+                        const pretty = data.pretty || null;
                         
                         // Yeni mesaj geldiğinde (önceki mesajdan farklıysa) ekle
                         if (message !== lastProcessedMessage && message !== '-' && message.trim() !== '') {
@@ -690,7 +691,7 @@
                         // Ana sayfadaki Bilgi bölümündeki elementi güncelle (sadece son mesaj)
                         const loraMessageInfoElement = document.getElementById('loraMessageInfo');
                         if (loraMessageInfoElement) {
-                            loraMessageInfoElement.textContent = message;
+                            loraMessageInfoElement.textContent = pretty || message;
                         }
                     }
                 })
