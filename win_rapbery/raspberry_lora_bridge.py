@@ -168,6 +168,8 @@ class RaspberryLoRaBridgeNode(Node):
         # =======================================================
         self.robot_launch_process = None
         self.test_launch_process = None
+        self.mapping_launch_process = None
+        self.map_save_launch_process = None
         
         # =======================================================
         # Veri Buffer (Ethernet'ten gelen veriler için)
@@ -248,6 +250,12 @@ class RaspberryLoRaBridgeNode(Node):
         
         if self.test_launch_process and self.test_launch_process.poll() is None:
             self.test_launch_process.terminate()
+        
+        if self.mapping_launch_process and self.mapping_launch_process.poll() is None:
+            self.mapping_launch_process.terminate()
+        
+        if self.map_save_launch_process and self.map_save_launch_process.poll() is None:
+            self.map_save_launch_process.terminate()
     
     def send_to_lora(self, data):
         """Veriyi LoRa üzerinden gönder (ham string; genelde JSON string)."""
@@ -373,6 +381,12 @@ class RaspberryLoRaBridgeNode(Node):
                     self.start_test_launch(["ros2", "launch", "turtlebot3_tests", "roaming_test.launch.py"])
                 elif msg == "steering_testi":
                     self.start_test_launch(["ros2", "launch", "turtlebot3_tests", "steering_test.launch.py"])
+                elif msg == "ortak_testi":
+                    self.start_test_launch(["ros2", "launch", "turtlebot3_tests", "ortak_test.launch.py"])
+                elif msg == "mapping_baslat":
+                    self.start_mapping_launch(["ros2", "launch", "turtlebot3_tests", "mapping.launch.py"])
+                elif msg == "mapping_bitir":
+                    self.finish_mapping_with_save()
                 elif msg == "testi_bitir":
                     self.stop_test_launch()
             
@@ -449,6 +463,68 @@ class RaspberryLoRaBridgeNode(Node):
         
         self.get_logger().info("Yeni test launch başlatılıyor...")
         self.test_launch_process = subprocess.Popen(cmd)
+
+    def start_mapping_launch(self, cmd):
+        """Mapping launch dosyasını başlat."""
+        if self.mapping_launch_process is not None and self.mapping_launch_process.poll() is None:
+            self.get_logger().info("Mapping launch zaten çalışıyor. Dokunulmadı.")
+            return
+        self.get_logger().info("Mapping launch başlatılıyor...")
+        self.mapping_launch_process = subprocess.Popen(cmd)
+
+    def start_map_save_launch(self, cmd):
+        """Map save launch dosyasını başlat."""
+        if self.map_save_launch_process is not None and self.map_save_launch_process.poll() is None:
+            self.get_logger().info("Map save launch zaten çalışıyor. Dokunulmadı.")
+            return
+        self.get_logger().info("Map save launch başlatılıyor...")
+        self.map_save_launch_process = subprocess.Popen(cmd)
+
+    def stop_mapping_and_save(self):
+        """Mapping ve map_save launch process'lerini sonlandır."""
+        if self.mapping_launch_process is not None and self.mapping_launch_process.poll() is None:
+            self.get_logger().info("Mapping launch durduruluyor...")
+            self.mapping_launch_process.terminate()
+            try:
+                self.mapping_launch_process.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                self.get_logger().warn("Mapping launch zorla öldürülüyor.")
+                self.mapping_launch_process.kill()
+        self.mapping_launch_process = None
+
+        if self.map_save_launch_process is not None and self.map_save_launch_process.poll() is None:
+            self.get_logger().info("Map save launch durduruluyor...")
+            self.map_save_launch_process.terminate()
+            try:
+                self.map_save_launch_process.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                self.get_logger().warn("Map save launch zorla öldürülüyor.")
+                self.map_save_launch_process.kill()
+        self.map_save_launch_process = None
+
+    def finish_mapping_with_save(self):
+        """
+        Mapping bitirme akışı:
+        1) Mapping çalışıyorsa map_save.launch'ı başlat.
+        2) 15 saniye bekle.
+        3) Mapping ve map_save launch'larını durdur.
+        """
+        if self.mapping_launch_process is None or self.mapping_launch_process.poll() is not None:
+            self.get_logger().warn("Mapping launch çalışmıyor, 'mapping_bitir' komutu yok sayıldı.")
+            return
+
+        # 1) map_save.launch'ı başlat
+        self.start_map_save_launch(["ros2", "launch", "turtlebot3_tests", "map_save.launch.py"])
+
+        # 2) 15 saniye sonra her ikisini de durdurmak için arka plan thread'i
+        def _worker():
+            self.get_logger().info("Map save için 15 saniye bekleniyor...")
+            time.sleep(15)
+            self.get_logger().info("15 saniye doldu, mapping ve map_save sonlandırılıyor...")
+            self.stop_mapping_and_save()
+
+        t = threading.Thread(target=_worker, daemon=True)
+        t.start()
     
     def stop_test_launch(self):
         """Test launch'ı durdur (arayüzden 'Testi Bitir' ile)."""

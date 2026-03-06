@@ -291,6 +291,7 @@
                                             <option value="rota">Rota Testi</option>
                                             <option value="roaming">Roaming Testi</option>
                                             <option value="steering">Steering Testi</option>
+                                            <option value="ortak">Ortak Test</option>
                                         </select>
                                         <div class="invalid-feedback">Lütfen bir test türü seçin</div>
                                     </div>
@@ -337,6 +338,12 @@
                                 </button>
                                 <button class="btn btn-danger btn-lg" id="stop" type="button">
                                     <i class="fas fa-stop"></i> Dur
+                                </button>
+                                <button class="btn btn-primary btn-lg" id="mappingStart" type="button">
+                                    <i class="fas fa-map me-2"></i> Haritalamayı Başlat
+                                </button>
+                                <button class="btn btn-danger btn-lg" id="mappingStop" type="button">
+                                    <i class="fas fa-save me-2"></i> Haritalamayı Bitir (Kaydet)
                                 </button>
                             </div>
                             <div class="mt-4">
@@ -517,6 +524,28 @@
                 });
             });
 
+            const mappingStartBtn = document.getElementById('mappingStart');
+            if (mappingStartBtn) {
+                mappingStartBtn.addEventListener('click', function() {
+                    fetch("{% url 'robot_control:send_command' %}", {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: 'command=mapping_baslat'
+                    }).catch(() => {});
+                });
+            }
+
+            const mappingStopBtn = document.getElementById('mappingStop');
+            if (mappingStopBtn) {
+                mappingStopBtn.addEventListener('click', function() {
+                    fetch("{% url 'robot_control:send_command' %}", {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: 'command=mapping_bitir'
+                    }).catch(() => {});
+                });
+            }
+
             const resetCommBtn = document.getElementById('resetCommBtn');
             if (resetCommBtn) {
                 resetCommBtn.addEventListener('click', function() {
@@ -596,6 +625,8 @@
                         command = 'roaming_testi';
                     } else if (testType === 'steering') {
                         command = 'steering_testi';
+                    } else if (testType === 'ortak') {
+                        command = 'ortak_testi';
                     }
                     if (!command) {
                         alert('Geçersiz test türü!');
