@@ -453,16 +453,16 @@ def printSummary(duration, band_steering_count, roaming_count, filename):
     summary += " "*35 + "TEST SUMMARY / TEST ÖZETI\n"
     summary += "="*100 + "\n\n"
     
-    summary += f"  ⏱️  Test Duration (Test Süresi)              : {duration} seconds ({duration // 60} min {duration % 60} sec)\n"
-    summary += f"  📊  Total Events Detected (Toplam Event)     : {band_steering_count + roaming_count}\n"
-    summary += f"  🔄  Band Steering Events                     : {band_steering_count}\n"
-    summary += f"  🌐  Roaming Events                           : {roaming_count}\n\n"
+    summary += f"  Test Duration (Test Süresi)              : {duration} seconds ({duration // 60} min {duration % 60} sec)\n"
+    summary += f"  Total Events Detected (Toplam Event)     : {band_steering_count + roaming_count}\n"
+    summary += f"  Band Steering Events                     : {band_steering_count}\n"
+    summary += f"  Roaming Events                           : {roaming_count}\n\n"
     
     if band_steering_count + roaming_count == 0:
-        summary += "  ℹ️  No events detected during the test period.\n"
+        summary += "  No events detected during the test period.\n"
         summary += "     (Test süresi boyunca hiçbir event tespit edilmedi.)\n\n"
     elif duration > 0:
-        summary += f"  📈  Event Rate (Olay Oranı)                  : {((band_steering_count + roaming_count) / duration * 60):.2f} events/minute\n\n"
+        summary += f"  Event Rate (Olay Oranı)                  : {((band_steering_count + roaming_count) / duration * 60):.2f} events/minute\n\n"
     
     summary += "="*100 + "\n"
     summary += " "*30 + "End of Test - Test Tamamlandı\n"

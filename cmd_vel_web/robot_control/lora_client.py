@@ -2,11 +2,10 @@ import serial
 import threading
 import json
 
-# Sıralı protokol: Raspberry mesaj gönderir → biz alırız (parse ederiz) → 1 sn sonra biz mesajımızı göndeririz (komut tam içeriği).
-# İlk açılışta: arayüz karşıdan cevap gelene kadar saniyede bir mesaj göndermeyi dener. İlk cevap geldikten sonra karşıdan cevap gelene kadar bekler.
-# İletişim reset: cevap gelmemiş olsa bile karşıya bir mesaj gönderir (Raspberry beklemeden çıksın).
+# Sıralı protokol (süre yok, sadece mesaj bekleme):
+# - Arayüz: Mesaj bekler → mesaj gelince komut varsa komutu, yoksa impuls (OK) gönderir → tekrar mesaj bekler.
+# - Raspberry: Mesaj gönderir → karşıdan mesaj bekler → mesaj gelince işler ve yeni mesaj gönderir.
 # LoRa 240 byte: Raspberry kısa anahtar gönderir (t,s,i,b,g,r,x,y,c,n,o,p,m,e,w,u); burada uzun anahtarlara çeviriyoruz.
-LORA_INTERVAL = 1.0
 
 # Kısa -> uzun anahtar eşlemesi (Raspberry compact format)
 _COMPACT_TO_LONG = {
@@ -43,170 +42,138 @@ def expand_compact_status(parsed):
             out[long_key] = v
     return out
 
+
+def _process_received_line(client, message: str) -> None:
+    """Alınan mesaj satırını işle (last_message, last_parsed_status, log)."""
+    with client._lock:
+        client.last_message = message
+    if message.startswith("{"):
+        try:
+            parsed = json.loads(message)
+            with client._lock:
+                client.last_parsed_status = expand_compact_status(parsed)
+            print(f"[LoRa] RX (JSON): state={parsed.get('state', parsed.get('s','?'))} ssid={parsed.get('ssid', parsed.get('i','?'))} ...")
+        except json.JSONDecodeError as e:
+            print(f"[LoRa] RX (ham): '{message[:60]}...' (JSON parse hatası: {e})")
+    else:
+        print(f"[LoRa] RX: '{message}'")
+
+
 class LoRaClient:
     def __init__(self, port: str = '/dev/ttyUSB0', baudrate: int = 9600):
-        self.serial_connection = serial.Serial(port, baudrate, timeout=1, write_timeout=1)
+        # Bloklayan okuma için timeout=None (mesaj gelene kadar bekler)
+        self.serial_connection = serial.Serial(port, baudrate, timeout=None, write_timeout=1)
         self.last_message = "-"
-        self.last_parsed_status = None  # LoRa'dan gelen son JSON (dict); Wi-Fi durumu
+        self.last_parsed_status = None
         self._lock = threading.Lock()
         self._running = True
         self._outgoing_message = "OK"
         self._outgoing_lock = threading.Lock()
-        # İlk açılış: karşıdan hiç cevap gelmediyse saniyede bir gönder; ilk cevap geldikten sonra karşıdan cevap gelene kadar bekle
-        self._first_response_received = False
-        self._response_received_since_send = False
-        self._state_lock = threading.Lock()
-        # Arka planda mesaj okuma thread'ini başlat
+        # Tek thread: mesaj bekle → alınca cevap gönder (komut veya OK)
         self._read_thread = threading.Thread(target=self._read_loop, daemon=True)
         self._read_thread.start()
-        # Her 1 saniyede bir giden mesajı gönderen thread
-        self._send_interval_thread = threading.Thread(target=self._send_interval_loop, daemon=True)
-        self._send_interval_thread.start()
-    
-    def _send_interval_loop(self):
-        """Her 1 saniyede bir: ilk cevap gelene kadar sürekli dene; ilk cevaptan sonra karşıdan cevap gelene kadar bekleyip sonra gönder."""
-        while self._running:
-            threading.Event().wait(LORA_INTERVAL)
-            if not self._running:
-                break
-            with self._state_lock:
-                first_ok = self._first_response_received
-                response_ok = self._response_received_since_send
-            # İlk cevap gelene kadar: her saniye gönder. İlk cevap geldikten sonra: sadece karşıdan cevap geldiyse gönder
-            if not first_ok or response_ok:
+
+    def _read_loop(self):
+        """Mesaj bekler (bloklayan okuma); mesaj gelince komut varsa komutu yoksa OK gönderir, sonra tekrar bekler."""
+        while self._running and self.serial_connection.is_open:
+            try:
+                line = self.serial_connection.readline()
+                if not line:
+                    continue
+                message = line.decode("utf-8", errors="ignore").strip()
+                if not message:
+                    continue
+                _process_received_line(self, message)
+                # Cevap gönder: bekleyen komut varsa onu, yoksa OK
                 with self._outgoing_lock:
-                    msg = self._outgoing_message
-                if msg and self.serial_connection.is_open:
-                    try:
-                        self.serial_connection.write((msg + "\n").encode("utf-8"))
-                        self.serial_connection.flush()
-                        with self._state_lock:
-                            self._response_received_since_send = False
-                        print(f"[LoRa] TX (1sn): '{msg}'")
-                    except Exception as e:
-                        print(f"[LoRa] HATA: Aralıklı gönderim - {e}")
+                    msg = self._outgoing_message or "OK"
+                    self._outgoing_message = "OK"
+                try:
+                    self.serial_connection.write((msg + "\n").encode("utf-8"))
+                    self.serial_connection.flush()
+                    print(f"[LoRa] TX: '{msg}'")
+                except Exception as e:
+                    print(f"[LoRa] HATA: Cevap gönderilemedi - {e}")
+            except Exception as e:
+                if self._running:
+                    print(f"[LoRa] HATA: Okuma/cevap döngüsü - {e}")
+                break
 
     def reset_communication(self) -> bool:
-        """İletişim reset: cevap gelmemiş olsa bile karşıya hemen bir mesaj gönderir (Raspberry beklemeden çıksın)."""
+        """İletişim reset: Raspberry beklemeden çıksın diye hemen OK gönderir."""
         if not self.serial_connection.is_open:
             print("[LoRa] İletişim reset: port kapalı")
             return False
         try:
-            msg = "OK"
-            self.serial_connection.write((msg + "\n").encode("utf-8"))
+            self.serial_connection.write(("OK\n").encode("utf-8"))
             self.serial_connection.flush()
-            with self._state_lock:
-                self._response_received_since_send = False  # bir sonraki periyodik gönderim yine cevap beklesin
-            print("[LoRa] İletişim reset: mesaj gönderildi")
+            print("[LoRa] İletişim reset: OK gönderildi")
             return True
         except Exception as e:
             print(f"[LoRa] İletişim reset hatası: {e}")
             return False
 
     def set_outgoing_message(self, message: str):
-        """Her 1 saniyede gönderilecek mesajı ayarla (komut tam içeriği; örn. 'ss', 'ww'). Boş bırakılırsa 'OK' kullanılır."""
+        """Bir sonraki cevapta gönderilecek mesajı ayarla (komut veya boş/OK)."""
         with self._outgoing_lock:
             self._outgoing_message = message if message else "OK"
 
-    def _read_loop(self):
-        """Arka planda sürekli mesaj okuma döngüsü"""
-        while self._running:
-            try:
-                self.read_message()
-            except Exception as e:
-                print(f"[LoRa] HATA: Okuma döngüsünde hata - {e}")
-            threading.Event().wait(1.0)  # 1 saniye bekle
-
     def send_command(self, command: str) -> bool:
+        """Komutu 'bekleyen cevap' olarak ayarlar; bir sonraki Raspberry mesajında bu komut gönderilir."""
         if not command:
             return False
-        try:
-            if not self.serial_connection.is_open:
-                print(f"[LoRa] HATA: Serial port kapalı!")
-                return False
-            
-            msg_str = f"{command}\n"
-            bytes_written = self.serial_connection.write(msg_str.encode('utf-8'))
-            
-            # Buffer'ı temizle - komutun gerçekten gönderilmesini garantile
-            self.serial_connection.flush()
-            
-            print(f"[LoRa] TX: '{command}' ({bytes_written} byte gönderildi)")
-            return True
-        except Exception as e:
-            print(f"[LoRa] HATA: Komut gönderilemedi - {e}")
+        if not self.serial_connection.is_open:
+            print("[LoRa] HATA: Serial port kapalı!")
             return False
+        self.set_outgoing_message(command)
+        print(f"[LoRa] Komut kuyruğa alındı (sonraki cevapta gönderilecek): '{command}'")
+        return True
 
     def read_message(self) -> str:
-        """Seri porttan mesaj okur ve son mesajı günceller"""
+        """Non-blocking: seri portta veri varsa oku ve güncelle. Yoksa None."""
         try:
-            if not self.serial_connection.is_open:
+            if not self.serial_connection.is_open or self.serial_connection.in_waiting == 0:
                 return None
-            
-            # Seri porttan veri oku
-            if self.serial_connection.in_waiting > 0:
-                line = self.serial_connection.readline()
-                if line:
-                    message = line.decode('utf-8', errors='ignore').strip()
-                    with self._lock:
-                        self.last_message = message
-                    with self._state_lock:
-                        self._first_response_received = True
-                        self._response_received_since_send = True
-                    # JSON ise parse et
-                    if message.startswith('{'):
-                        try:
-                            parsed = json.loads(message)
-                            with self._lock:
-                                self.last_parsed_status = expand_compact_status(parsed)
-                            print(f"[LoRa] RX (JSON): state={parsed.get('state', parsed.get('s','?'))} ssid={parsed.get('ssid', parsed.get('i','?'))} ...")
-                        except json.JSONDecodeError as e:
-                            print(f"[LoRa] RX (ham): '{message[:60]}...' (JSON parse hatası: {e})")
-                    else:
-                        print(f"[LoRa] RX: '{message}'")
-                    return message
+            line = self.serial_connection.readline()
+            if not line:
+                return None
+            message = line.decode("utf-8", errors="ignore").strip()
+            _process_received_line(self, message)
+            return message
         except Exception as e:
             print(f"[LoRa] HATA: Mesaj okunamadı - {e}")
         return None
 
     def get_last_message(self) -> str:
-        """Son alınan ham mesajı döndürür"""
         with self._lock:
             return self.last_message
 
     def get_parsed_status(self) -> dict:
-        """LoRa'dan gelen son Wi-Fi durumunu (JSON parse edilmiş dict) döndürür. Yoksa None."""
         with self._lock:
             return self.last_parsed_status.copy() if self.last_parsed_status else None
 
+
 try:
-    lora_client = LoRaClient('/dev/ttyUSB0', 9600)
-    print("[LoRa] Serial port bağlantısı başarıyla açıldı: /dev/ttyUSB0 (9600 baud)")
+    lora_client = LoRaClient("/dev/ttyUSB0", 9600)
+    print("[LoRa] Serial port açıldı: /dev/ttyUSB0 (9600 baud), mesaj-bekleme modu")
 except (serial.SerialException, FileNotFoundError) as e:
     print(f"[LoRa] UYARI: Serial port açılamadı ({e}). Dummy modunda çalışılıyor.")
     class DummyLoRaClient:
         def __init__(self):
             self.last_message = "-"
             self.last_parsed_status = None
-        
         def set_outgoing_message(self, message: str):
             pass
-
         def reset_communication(self) -> bool:
-            print("[LoRa] DUMMY: İletişim reset (gerçek gönderim yok)")
+            print("[LoRa] DUMMY: İletişim reset")
             return False
-        
         def send_command(self, command):
-            print(f"[LoRa] DUMMY TX: '{command}' (gerçek gönderim yok - serial port bulunamadı)")
-            return False
-        
+            print(f"[LoRa] DUMMY: Komut kuyruğa alındı '{command}'")
+            return bool(command)
         def read_message(self):
             return None
-        
         def get_last_message(self):
             return self.last_message
-        
         def get_parsed_status(self):
             return self.last_parsed_status
-    
-    lora_client = DummyLoRaClient() 
+    lora_client = DummyLoRaClient()

@@ -47,8 +47,8 @@ Detaylı iletişim ve mesaj uyumu için: **[ILETISIM_VE_MESAJ_RAPORU.md](ILETISI
 ### 1. Ubuntu – Web Arayüzü (cmd_vel_web)
 
 ```bash
-cd cmd_vel_web
 pip install -r requirements.txt
+cd cmd_vel_web
 python manage.py migrate
 python manage.py createsuperuser   # İlk kurulumda
 python manage.py runserver
@@ -71,7 +71,7 @@ python3 raspberry_lora_bridge.py
 
 ### 3. Windows PC – Wi-Fi Verisi (win_rapbery)
 
-Windows’ta Python 3, `pyfiglet`, `psutil` kurulu olmalı. Raspberry ile aynı ağda (Ethernet) ve Raspberry IP’si 192.168.1.11 olmalı.
+Windows’ta Python 3, Bağımlılıklar: `pip install -r requirements.txt` (psutil, pyfiglet dahil). Raspberry ile aynı ağda (Ethernet) ve Raspberry IP’si 192.168.1.11 olmalı.
 
 ```bash
 cd win_rapbery
