@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
 Raspberry Pi Birleşik LoRa Bridge
-1. Windows PC'den Ethernet (TCP) üzerinden veri al → JSON stringe çevir → LoRa ile Ubuntu'ya sıralı gönder
-2. LoRa'dan Ubuntu'dan gelen mesajı bekle (komut tam içeriği); mesaj gelmeden yeni mesaj gönderme
-3. /battery_state ROS2 topiğinden batarya yüzdesini al → LoRa ile Windows/RPi batarya bilgisiyle birlikte gönder
 
-Sıralı iletişim (süre yok, sadece mesaj bekleme):
-RPi mesaj gönderir → Ubuntu'dan mesaj bekler → mesaj gelince işler ve yeni mesaj gönderir.
-Ubuntu mesaj bekler → mesaj gelince komut varsa komutu yoksa OK gönderir.
+1. Windows PC'den TCP ile veri al → JSON'a çevir → LoRa ile Ubuntu'ya gönder
+   (Buffer boşsa boş JSON {} gönderilir; Windows bağlı değilken yine de el sıkışma devam eder.)
+2. LoRa'dan Ubuntu cevabını bekle → mesaj gelince işle (komut/OK) → yeni mesaj gönderme sırası gelir
+3. /battery_state'ten batarya yüzdesi al → Windows verisiyle birleştirip LoRa'ya ekler
+4. /state topic'ine event kodu (0,1,2,-1) saniyede bir publish edilir
+
+Sıralı protokol: RPi gönderir → Ubuntu cevap verene kadar bekler → cevap gelince işler → tekrar gönderir.
 """
 import socket
 import serial
 import time
-import sys
 import subprocess
 import threading
 import json
@@ -28,8 +28,14 @@ LORA_PORT = "/dev/ttyAMA0"
 LORA_BAUDRATE = 9600
 LORA_MAX_BYTES = 240  # LoRa paket boyut sınırı (byte)
 
+def _to_num(s, default=0):
+    try:
+        return float(str(s).replace("%", "").replace(" dBm", "").replace(" Mbps", "").strip())
+    except (ValueError, TypeError):
+        return default
+
+
 def parse_windows_status_line(line):
-    """Windows WifiStatusTcpSender satırını parse edip dict döndürür. JSON ile LoRa'ya gönderilir."""
     out = {}
     for part in line.split("|"):
         part = part.strip()
@@ -40,17 +46,6 @@ def parse_windows_status_line(line):
 
 
 def compact_status_for_lora(obj):
-    """
-    Parse edilmiş Windows durumunu LoRa 240 byte sınırına uygun kısa formata çevirir.
-    Kısa anahtarlar: t=time, s=state, i=ssid, b=bssid, g=signal, r=rssi, x=rx, y=tx,
-    c=channel, n=band, o=radio, p=cpu, m=ram, e=event
-    """
-    def num(s, default=0):
-        try:
-            return float(str(s).replace("%", "").replace(" dBm", "").replace(" Mbps", "").strip())
-        except (ValueError, TypeError):
-            return default
-
     out = {}
     if "time" in obj:
         raw = obj["time"]
@@ -69,15 +64,15 @@ def compact_status_for_lora(obj):
     if "bssid" in obj:
         out["b"] = (obj["bssid"] or "").strip()
     if "signal" in obj:
-        out["g"] = num(obj["signal"], 0)
+        out["g"] = _to_num(obj["signal"], 0)
     if "rssi" in obj:
-        out["r"] = num(obj["rssi"], 0)
+        out["r"] = _to_num(obj["rssi"], 0)
     if "rx" in obj:
-        out["x"] = num(obj["rx"], 0)
+        out["x"] = _to_num(obj["rx"], 0)
     if "tx" in obj:
-        out["y"] = num(obj["tx"], 0)
+        out["y"] = _to_num(obj["tx"], 0)
     if "channel" in obj:
-        out["c"] = num(obj["channel"], 0)
+        out["c"] = _to_num(obj["channel"], 0)
     if "band" in obj:
         b = (obj["band"] or "").replace(" GHz", "").replace("*", "").strip()
         out["n"] = "5G" if b == "5" else ("2.4" if b == "2.4" else b[:4])
@@ -92,16 +87,16 @@ def compact_status_for_lora(obj):
         else:
             out["o"] = r[-2:] if len(r) >= 2 else r
     if "cpu" in obj:
-        out["p"] = num(obj["cpu"], 0)
+        out["p"] = _to_num(obj["cpu"], 0)
     if "ram" in obj:
-        out["m"] = num(obj["ram"], 0)
+        out["m"] = _to_num(obj["ram"], 0)
     if "event" in obj:
         out["e"] = obj["event"].strip()
     # Windows ve Raspberry batarya yüzdeleri (wbatt, rbatt)
     if "wbatt" in obj:
-        out["w"] = num(obj["wbatt"], 0)
+        out["w"] = _to_num(obj["wbatt"], 0)
     if "rbatt" in obj:
-        out["u"] = num(obj["rbatt"], 0)
+        out["u"] = _to_num(obj["rbatt"], 0)
     return out
 
 
@@ -155,9 +150,7 @@ class RaspberryLoRaBridgeNode(Node):
         self.state_pub = self.create_publisher(Int32, '/state', 10)
         self.target_lin = 0.0
         self.target_ang = 0.0
-        # Event kodu: 0=event yok, 1=Band Steering, 2=Roaming, -1=hata
-        self._last_event_code = 0
-        self._event_code_lock = threading.Lock()
+        self.last_event_code = 0  # 0=yok, 1=BandSteering, 2=Roaming, -1=hata
         self.twist_msg = Twist()
         # /battery_state topiğinden gelen batarya yüzdesi (0–100 arası float)
         self.rpi_batt_percent = None
@@ -187,87 +180,58 @@ class RaspberryLoRaBridgeNode(Node):
         self.lora_thread = threading.Thread(target=self._lora_cycle_loop, daemon=True)
         self.lora_thread.start()
 
-        # TCP bağlantısını yönetmek için timer
-        self.tcp_timer = self.create_timer(0.5, self.tcp_accept_callback)
-        # /state topic: event kodunu saniyede bir publish et
         self.state_timer = self.create_timer(1.0, self._state_timer_callback)
         self.client_socket = None
         self.client_file = None
-        
-        # TCP okuma thread'i
-        self.tcp_thread = None
         self.tcp_running = True
-        self.start_tcp_thread()
+        threading.Thread(target=self.tcp_read_loop, daemon=True).start()
         
         self.get_logger().info("Tüm özellikler başlatıldı. Sistem hazır.")
 
     def _state_timer_callback(self):
-        """Saniyede bir /state topic'ine event kodunu (0, 1, 2, -1) publish eder."""
-        with self._event_code_lock:
-            code = self._last_event_code
         msg = Int32()
-        msg.data = code
+        msg.data = self.last_event_code
         self.state_pub.publish(msg)
 
     def battery_callback(self, msg: BatteryState):
-        """ROS2 /battery_state topiğinden gelen batarya yüzdesini sakla."""
         try:
             perc = msg.percentage
-            if perc is None:
+            if perc is None or perc < 0:
                 return
-            # Birçok BatteryState implementasyonunda percentage 0–1 veya 0–100 olabilir.
-            # 0–1 aralığı ise 100 ile çarp.
             if 0.0 <= perc <= 1.0:
                 perc = perc * 100.0
-            # Geçerli aralıkta değilse dokunma
-            if perc < 0.0:
-                return
             self.rpi_batt_percent = perc
         except Exception:
-            # Hatalı mesaj durumunda sessizce geç
+            pass
+
+    def _close(self, obj):
+        if obj:
+            try:
+                obj.close()
+            except Exception:
+                pass
+
+    def _stop_process(self, proc):
+        if proc is None or proc.poll() is not None:
             return
-    
+        proc.terminate()
+        try:
+            proc.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+
     def cleanup(self):
-        """Kaynakları temizle"""
         self.lora_running = False
         self.tcp_running = False
-        
-        if self.client_file:
-            try:
-                self.client_file.close()
-            except:
-                pass
-        
-        if self.client_socket:
-            try:
-                self.client_socket.close()
-            except:
-                pass
-        
-        if self.tcp_socket:
-            try:
-                self.tcp_socket.close()
-            except:
-                pass
-        
+        self._close(self.client_file)
+        self._close(self.client_socket)
+        self._close(self.tcp_socket)
         if self.lora_serial and self.lora_serial.is_open:
-            try:
-                self.lora_serial.close()
-            except:
-                pass
-        
-        # Launch process'leri durdur
-        if self.robot_launch_process and self.robot_launch_process.poll() is None:
-            self.robot_launch_process.terminate()
-        
-        if self.test_launch_process and self.test_launch_process.poll() is None:
-            self.test_launch_process.terminate()
-        
-        if self.mapping_launch_process and self.mapping_launch_process.poll() is None:
-            self.mapping_launch_process.terminate()
-        
-        if self.map_save_launch_process and self.map_save_launch_process.poll() is None:
-            self.map_save_launch_process.terminate()
+            self._close(self.lora_serial)
+        self._stop_process(self.robot_launch_process)
+        self._stop_process(self.test_launch_process)
+        self._stop_process(self.mapping_launch_process)
+        self._stop_process(self.map_save_launch_process)
     
     def send_to_lora(self, data):
         """Veriyi LoRa üzerinden gönder (ham string; genelde JSON string)."""
@@ -280,11 +244,6 @@ class RaspberryLoRaBridgeNode(Node):
         except serial.SerialException as e:
             self.get_logger().error(f"LoRa gönderme hatası: {e}")
             return False
-    
-    def start_tcp_thread(self):
-        """TCP okuma thread'ini başlat"""
-        self.tcp_thread = threading.Thread(target=self.tcp_read_loop, daemon=True)
-        self.tcp_thread.start()
     
     def tcp_read_loop(self):
         """TCP okuma döngüsü (ayrı thread'de çalışır)"""
@@ -310,26 +269,14 @@ class RaspberryLoRaBridgeNode(Node):
                     if line:
                         line = line.strip()
                         if line:
-                            self.get_logger().info(f"[TCP RX] {line[:80]}...")
-                            # Veriyi buffer'a ekle (2 saniyede bir LoRa'ya gönderilecek)
                             with self.buffer_lock:
                                 self.data_buffer.append(line)
                     elif not line:
                         # Bağlantı kapandı
                         raise ConnectionError("Bağlantı kapandı")
-                except (ConnectionError, OSError) as e:
-                    # Bağlantı kapandı
-                    self.get_logger().info("TCP bağlantı kapandı")
-                    if self.client_file:
-                        try:
-                            self.client_file.close()
-                        except:
-                            pass
-                    if self.client_socket:
-                        try:
-                            self.client_socket.close()
-                        except:
-                            pass
+                except (ConnectionError, OSError):
+                    self._close(self.client_file)
+                    self._close(self.client_socket)
                     self.client_socket = None
                     self.client_file = None
                     time.sleep(0.5)
@@ -340,10 +287,6 @@ class RaspberryLoRaBridgeNode(Node):
                 self.get_logger().error(f"TCP döngü hatası: {e}")
                 time.sleep(1)
     
-    def tcp_accept_callback(self):
-        """TCP timer callback (şu an kullanılmıyor, thread kullanıyoruz)"""
-        pass
-
     def _lora_cycle_loop(self):
         """Süre yok: gönder → karşıdan mesaj bekle → mesaj gelince işle → tekrar gönder (döngüler arasında 1 sn bekleme)."""
         while self.lora_running and rclpy.ok():
@@ -360,8 +303,7 @@ class RaspberryLoRaBridgeNode(Node):
                     if self.send_from_buffer():
                         self.lora_waiting_reply = True
                     else:
-                        self.send_to_lora("{}")
-                        self.lora_waiting_reply = True
+                        self.lora_waiting_reply = self.send_to_lora("{}")
                 time.sleep(1.0)
             except Exception as e:
                 if self.lora_running:
@@ -371,7 +313,7 @@ class RaspberryLoRaBridgeNode(Node):
     def process_lora_message(self, msg: str):
         """LoRa'dan gelen mesajı işle (komut veya impuls); sıradaki gönderime izin verir."""
         try:
-            self.get_logger().info(f"LoRa RX: {msg[:60]}...")
+            self.get_logger().info(f"LoRa RX: {msg[:120]}...")
             if msg == "ww":
                 self.target_lin = constrain(self.target_lin + LIN_VEL_STEP_SIZE, -MAX_LIN_VEL, MAX_LIN_VEL)
             elif msg == "xx":
@@ -384,9 +326,10 @@ class RaspberryLoRaBridgeNode(Node):
                 self.target_lin = 0.0
                 self.target_ang = 0.0
 
-            self.twist_msg.linear.x = self.target_lin
-            self.twist_msg.angular.z = self.target_ang
-            self.cmd_vel_pub.publish(self.twist_msg)
+            if msg in ("ww", "xx", "aa", "dd", "ss"):
+                self.twist_msg.linear.x = self.target_lin
+                self.twist_msg.angular.z = self.target_ang
+                self.cmd_vel_pub.publish(self.twist_msg)
 
             if msg == "robot_launch":
                 self.start_robot_launch(["ros2", "launch", "turtlebot3_bringup", "robot.launch.py"])
@@ -409,8 +352,7 @@ class RaspberryLoRaBridgeNode(Node):
         except Exception as e:
             self.get_logger().warn(f"LoRa mesaj işleme hatası: {e}")
 
-    def send_from_buffer(self) -> bool:
-        """Buffer'daki en son veriyi kısaltıp LoRa'ya gönder. Gönderildiyse True, buffer boşsa False."""
+    def send_from_buffer(self):
         if self.lora_waiting_reply:
             return False
         with self.buffer_lock:
@@ -420,7 +362,6 @@ class RaspberryLoRaBridgeNode(Node):
             self.data_buffer = [data_line]  # Son veriyi tut; yeni TCP verisi gelene kadar tekrar gönder
         try:
             obj = parse_windows_status_line(data_line)
-            # Event kodunu çıkar ve sakla (0, 1, 2, -1)
             event_code = 0
             if "ERROR" in data_line:
                 event_code = -1
@@ -431,8 +372,7 @@ class RaspberryLoRaBridgeNode(Node):
                         event_code = 0
                 except (ValueError, TypeError):
                     pass
-            with self._event_code_lock:
-                self._last_event_code = event_code
+            self.last_event_code = event_code
             if self.rpi_batt_percent is not None:
                 obj["rbatt"] = f"{self.rpi_batt_percent:.0f}%"
             compact = compact_status_for_lora(obj)
@@ -448,8 +388,7 @@ class RaspberryLoRaBridgeNode(Node):
             max_payload = LORA_MAX_BYTES - 1
             b = data_line.encode("utf-8")
             json_str = b[:max_payload].decode("utf-8", errors="ignore") if len(b) > max_payload else data_line
-        self.send_to_lora(json_str)
-        return True
+        return self.send_to_lora(json_str)
     
     def start_robot_launch(self, cmd):
         """Robot launch dosyasını başlat"""
@@ -462,32 +401,11 @@ class RaspberryLoRaBridgeNode(Node):
         self.robot_launch_process = subprocess.Popen(cmd)
 
     def stop_robot_launch(self):
-        """Robot launch'ı durdur (LoRa'dan 'robot_bitir' komutu ile)."""
-        if self.robot_launch_process is None:
-            return
-        if self.robot_launch_process.poll() is None:
-            self.get_logger().info("Robot launch durduruluyor...")
-            self.robot_launch_process.terminate()
-            try:
-                self.robot_launch_process.wait(timeout=3)
-            except subprocess.TimeoutExpired:
-                self.get_logger().warn("Robot launch zorla öldürülüyor.")
-                self.robot_launch_process.kill()
+        self._stop_process(self.robot_launch_process)
         self.robot_launch_process = None
     
     def start_test_launch(self, cmd):
-        """Test launch dosyasını başlat (önceki test'i durdur)"""
-        if self.test_launch_process is not None:
-            if self.test_launch_process.poll() is None:
-                self.get_logger().warn("Önceki test launch durduruluyor...")
-                self.test_launch_process.terminate()
-                try:
-                    self.test_launch_process.wait(timeout=3)
-                except subprocess.TimeoutExpired:
-                    self.get_logger().warn("Test launch zorla öldürülüyor.")
-                    self.test_launch_process.kill()
-        
-        self.get_logger().info("Yeni test launch başlatılıyor...")
+        self._stop_process(self.test_launch_process)
         self.test_launch_process = subprocess.Popen(cmd)
 
     def start_mapping_launch(self, cmd):
@@ -507,25 +425,9 @@ class RaspberryLoRaBridgeNode(Node):
         self.map_save_launch_process = subprocess.Popen(cmd)
 
     def stop_mapping_and_save(self):
-        """Mapping ve map_save launch process'lerini sonlandır."""
-        if self.mapping_launch_process is not None and self.mapping_launch_process.poll() is None:
-            self.get_logger().info("Mapping launch durduruluyor...")
-            self.mapping_launch_process.terminate()
-            try:
-                self.mapping_launch_process.wait(timeout=3)
-            except subprocess.TimeoutExpired:
-                self.get_logger().warn("Mapping launch zorla öldürülüyor.")
-                self.mapping_launch_process.kill()
+        self._stop_process(self.mapping_launch_process)
+        self._stop_process(self.map_save_launch_process)
         self.mapping_launch_process = None
-
-        if self.map_save_launch_process is not None and self.map_save_launch_process.poll() is None:
-            self.get_logger().info("Map save launch durduruluyor...")
-            self.map_save_launch_process.terminate()
-            try:
-                self.map_save_launch_process.wait(timeout=3)
-            except subprocess.TimeoutExpired:
-                self.get_logger().warn("Map save launch zorla öldürülüyor.")
-                self.map_save_launch_process.kill()
         self.map_save_launch_process = None
 
     def finish_mapping_with_save(self):
@@ -553,16 +455,7 @@ class RaspberryLoRaBridgeNode(Node):
         t.start()
     
     def stop_test_launch(self):
-        """Test launch'ı durdur (arayüzden 'Testi Bitir' ile)."""
-        if self.test_launch_process is None:
-            return
-        if self.test_launch_process.poll() is None:
-            self.get_logger().info("Test launch durduruluyor...")
-            self.test_launch_process.terminate()
-            try:
-                self.test_launch_process.wait(timeout=3)
-            except subprocess.TimeoutExpired:
-                self.test_launch_process.kill()
+        self._stop_process(self.test_launch_process)
         self.test_launch_process = None
     
     
