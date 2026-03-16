@@ -20,6 +20,7 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import BatteryState
+from std_msgs.msg import Int32
 
 # Konfigürasyon
 TCP_PORT = 5001
@@ -151,8 +152,12 @@ class RaspberryLoRaBridgeNode(Node):
         # ROS2 Publisher / Subscriber
         # =======================================================
         self.cmd_vel_pub = self.create_publisher(Twist, 'cmd_vel', 10)
+        self.state_pub = self.create_publisher(Int32, '/state', 10)
         self.target_lin = 0.0
         self.target_ang = 0.0
+        # Event kodu: 0=event yok, 1=Band Steering, 2=Roaming, -1=hata
+        self._last_event_code = 0
+        self._event_code_lock = threading.Lock()
         self.twist_msg = Twist()
         # /battery_state topiğinden gelen batarya yüzdesi (0–100 arası float)
         self.rpi_batt_percent = None
@@ -184,6 +189,8 @@ class RaspberryLoRaBridgeNode(Node):
 
         # TCP bağlantısını yönetmek için timer
         self.tcp_timer = self.create_timer(0.5, self.tcp_accept_callback)
+        # /state topic: event kodunu saniyede bir publish et
+        self.state_timer = self.create_timer(1.0, self._state_timer_callback)
         self.client_socket = None
         self.client_file = None
         
@@ -193,6 +200,14 @@ class RaspberryLoRaBridgeNode(Node):
         self.start_tcp_thread()
         
         self.get_logger().info("Tüm özellikler başlatıldı. Sistem hazır.")
+
+    def _state_timer_callback(self):
+        """Saniyede bir /state topic'ine event kodunu (0, 1, 2, -1) publish eder."""
+        with self._event_code_lock:
+            code = self._last_event_code
+        msg = Int32()
+        msg.data = code
+        self.state_pub.publish(msg)
 
     def battery_callback(self, msg: BatteryState):
         """ROS2 /battery_state topiğinden gelen batarya yüzdesini sakla."""
@@ -330,7 +345,7 @@ class RaspberryLoRaBridgeNode(Node):
         pass
 
     def _lora_cycle_loop(self):
-        """Süre yok: gönder → karşıdan mesaj bekle → mesaj gelince işle → tekrar gönder."""
+        """Süre yok: gönder → karşıdan mesaj bekle → mesaj gelince işle → tekrar gönder (döngüler arasında 1 sn bekleme)."""
         while self.lora_running and rclpy.ok():
             try:
                 if self.lora_waiting_reply:
@@ -347,6 +362,7 @@ class RaspberryLoRaBridgeNode(Node):
                     else:
                         self.send_to_lora("{}")
                         self.lora_waiting_reply = True
+                time.sleep(1.0)
             except Exception as e:
                 if self.lora_running:
                     self.get_logger().warn(f"LoRa döngü hatası: {e}")
@@ -394,16 +410,29 @@ class RaspberryLoRaBridgeNode(Node):
             self.get_logger().warn(f"LoRa mesaj işleme hatası: {e}")
 
     def send_from_buffer(self) -> bool:
-        """Buffer'daki en son veriyi LoRa'ya gönder. Gönderildiyse True, buffer boşsa False."""
+        """Buffer'daki en son veriyi kısaltıp LoRa'ya gönder. Gönderildiyse True, buffer boşsa False."""
         if self.lora_waiting_reply:
             return False
         with self.buffer_lock:
             if not self.data_buffer:
                 return False
             data_line = self.data_buffer[-1]
-            self.data_buffer.clear()
+            self.data_buffer = [data_line]  # Son veriyi tut; yeni TCP verisi gelene kadar tekrar gönder
         try:
             obj = parse_windows_status_line(data_line)
+            # Event kodunu çıkar ve sakla (0, 1, 2, -1)
+            event_code = 0
+            if "ERROR" in data_line:
+                event_code = -1
+            elif "event" in obj:
+                try:
+                    event_code = int(obj["event"].strip())
+                    if event_code not in (1, 2):
+                        event_code = 0
+                except (ValueError, TypeError):
+                    pass
+            with self._event_code_lock:
+                self._last_event_code = event_code
             if self.rpi_batt_percent is not None:
                 obj["rbatt"] = f"{self.rpi_batt_percent:.0f}%"
             compact = compact_status_for_lora(obj)
